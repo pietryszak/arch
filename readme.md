@@ -263,7 +263,7 @@ Instalujemy:
 pacstrap -K /mnt \
   base linux linux-firmware intel-ucode btrfs-progs \
   grub efibootmgr \
-  networkmanager openssh sudo neovim wget git curl btop fastfetch man-db man-pages \
+  networkmanager openssh sudo neovim bash-completion wget git curl btop fastfetch man-db man-pages \
   pipewire-audio pipewire-alsa pipewire-pulse wireplumber sof-firmware \
   plasma-desktop plasma-login-manager plasma-nm polkit-kde-agent \
   dolphin konsole \
@@ -584,12 +584,12 @@ Wyjmij pendrive instalacyjny.
 Po zalogowaniu do zainstalowanego systemu:
 
 ```bash
-cat /proc/cmdline
-swapon --show
-snapper -c root list
-snapper -c home list
-systemctl status grub-btrfsd.service --no-pager
-grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
+sudo cat /proc/cmdline
+sudo swapon --show
+sudo snapper -c root list
+sudo snapper -c home list
+sudo systemctl status grub-btrfsd.service --no-pager
+sudo grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
 ```
 
 To potwierdza:
