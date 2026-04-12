@@ -770,8 +770,6 @@ Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
 
 ---
 
----
-
 # 29. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
@@ -847,8 +845,6 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
----
-
 # 30. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
@@ -872,6 +868,9 @@ Po wykonaniu wszystkich kroków system ma:
 - Firefox
 - Thunderbird
 - Brave
+- ładny motyw GRUB-a
+- splash screen Plymouth
+- motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
 
 Dodatkowo rollback `/home` nie będzie ruszał:
 
@@ -882,7 +881,4 @@ Dodatkowo rollback `/home` nie będzie ruszał:
 - kluczy SSH
 
 bo te katalogi mają własne subvolume poza snapshotami `@home`.
----
-- ładny motyw GRUB-a
-- splash screen Plymouth
-- motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
+
