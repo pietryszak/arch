@@ -647,7 +647,110 @@ sudo localectl --no-convert set-x11-keymap pl
 
 ---
 
-# 23. Stan końcowy systemu
+---
+
+# 24. Po instalacji: narzędzia deweloperskie i `yay`
+
+`git`, `wget` i `curl` są już instalowane w bazowym `pacstrap`, ale do budowania pakietów z AUR potrzebujesz jeszcze `base-devel`.
+
+Do jednorazowej instalacji `yay` najprościej użyć `/tmp`:
+
+```bash
+sudo pacman -S --needed base-devel git wget curl
+cd /tmp
+git clone https://aur.archlinux.org/yay.git
+cd yay
+makepkg -si
+```
+
+To wystarczy do poprawnej instalacji `yay`.
+
+Opcjonalnie możesz później utworzyć własny katalog, na przykład `~/.gc`, jeśli chcesz trzymać tam:
+
+- klony z GitHuba
+- PKGBUILD-y z AUR
+- własne skrypty i repozytoria
+
+Przykład:
+
+```bash
+mkdir -p ~/.gc
+```
+
+---
+
+# 25. Po instalacji: drukarka i skaner Brother DCP-B7520DW
+
+Dla KDE i urządzeń wielofunkcyjnych warto doinstalować:
+
+- CUPS
+- GUI do drukarek
+- wykrywanie urządzeń po sieci
+- warstwę skanera SANE
+
+Zainstaluj pakiety z repozytoriów:
+
+```bash
+sudo pacman -S cups print-manager system-config-printer avahi nss-mdns sane simple-scan
+sudo systemctl enable --now cups.service avahi-daemon.service
+```
+
+Następnie doinstaluj pakiety Brothera z AUR:
+
+```bash
+yay -S brother-dcp-b7520dw brscan4 brscan-skey
+```
+
+To daje:
+
+- sterownik drukarki dla Brother DCP-B7520DW
+- sterownik skanera Brother
+- obsługę przycisku „Scan” z urządzenia
+
+Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`.
+
+---
+
+# 26. Konfiguracja skanera Brother po sieci
+
+Najpierw ustal adres IP drukarki/skanera w sieci lokalnej.
+
+Potem dodaj urządzenie do konfiguracji `brscan4`:
+
+```bash
+sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=IP_DRUKARKI
+scanimage -L
+```
+
+Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
+
+---
+
+# 27. Dodatkowe uwagi do Brothera
+
+Jeśli urządzenie nie zostanie wykryte automatycznie po sieci:
+
+1. sprawdź, czy drukarka i laptop są w tej samej sieci
+2. sprawdź, czy działa `cups.service`
+3. sprawdź, czy działa `avahi-daemon.service`
+4. sprawdź ręcznie, czy skaner odpowiada po `brsaneconfig4`
+5. przy problemach z przyciskiem „Scan” sprawdź, czy potrzebujesz `brscan-skey`
+
+Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
+
+- `cups`
+- `print-manager`
+- `system-config-printer`
+- `avahi`
+- `nss-mdns`
+- `sane`
+- `simple-scan`
+- `brother-dcp-b7520dw`
+- `brscan4`
+
+---
+
+# 28. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -665,6 +768,8 @@ Po wykonaniu wszystkich kroków system ma:
 - strefę `Europe/Warsaw`
 - `neovim`
 - `wget`, `git`, `curl`, `btop`, `fastfetch`
+- `yay`
+- obsługę drukarki i skanera Brother DCP-B7520DW
 
 Dodatkowo rollback `/home` nie będzie ruszał:
 
