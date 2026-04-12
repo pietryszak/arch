@@ -267,7 +267,7 @@ pacstrap -K /mnt \
   plasma-meta \
   dolphin konsole \
   xdg-user-dirs xdg-desktop-portal power-profiles-daemon \
-  snapper grub-btrfs inotify-tools
+  snapper grub-btrfs inotify-tools bash-completion
 ```
 
 > **Uwaga:** `plasma-meta` dociąga pełny zestaw komponentów Plasma, więc instalacja będzie wyraźnie większa niż przy ręcznie skrojonym, minimalnym zestawie.  
