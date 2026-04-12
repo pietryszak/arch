@@ -803,3 +803,89 @@ Dodatkowo rollback `/home` nie będzie ruszał:
 - kluczy SSH
 
 bo te katalogi mają własne subvolume poza snapshotami `@home`.
+
+---
+
+# 31. Opcjonalnie: ładny splash screen Arch + motyw GRUB
+
+Jeśli chcesz mieć ładniejszy ekran startowy pasujący do ciemnego KDE Plasma, możesz dodać:
+
+- `breeze-grub` dla estetycznego GRUB-a
+- `plymouth` jako splash screen przy starcie
+- motyw `plymouth-theme-arch-breeze-git` z AUR
+
+Instalacja:
+
+```bash
+sudo pacman -S plymouth plymouth-kcm breeze-grub
+yay -S plymouth-theme-arch-breeze-git
+```
+
+Ustawienie motywu Plymouth:
+
+```bash
+sudo plymouth-set-default-theme -R arch-breeze
+```
+
+Konfiguracja GRUB-a:
+
+Otwórz plik:
+
+```bash
+sudo nvim /etc/default/grub
+```
+
+Upewnij się, że linia wygląda mniej więcej tak:
+
+```bash
+GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet splash resume=UUID=TWOJ_SWAP_UUID"
+GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"
+```
+
+Jeśli masz już ustawione `resume=UUID=...`, po prostu dopisz `splash` i dodaj linię `GRUB_THEME=...`.
+
+Konfiguracja `mkinitcpio`:
+
+Otwórz plik:
+
+```bash
+sudo nvim /etc/mkinitcpio.conf
+```
+
+Dodaj hook `plymouth` przed `filesystems`.
+
+Przykład:
+
+```bash
+HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block plymouth filesystems resume fsck)
+```
+
+Potem przebuduj initramfs i GRUB:
+
+```bash
+sudo mkinitcpio -P
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Po restarcie system powinien pokazywać:
+
+- estetyczny motyw GRUB-a
+- splash screen Plymouth w stylu Arch + Breeze
+
+Jeśli motyw Ci się nie spodoba, możesz wrócić do zwykłego Breeze:
+
+```bash
+sudo pacman -S breeze-plymouth
+sudo plymouth-set-default-theme -R breeze
+```
+
+---
+
+# 32. Końcowy stan systemu
+
+Po wykonaniu wszystkich kroków system może mieć dodatkowo:
+
+- ładny motyw GRUB-a
+- splash screen Plymouth
+- motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
+
