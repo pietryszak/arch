@@ -674,7 +674,12 @@ sudo pacman -S --needed \
   firefox thunderbird \
   bluez bluez-utils bluez-obex \
   linux-headers dkms \
-  plymouth plymouth-kcm breeze-grub
+  plymouth plymouth-kcm breeze-grub \
+  vlc ffmpeg x264 x265 \
+  gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav \
+  libdvdcss libdvdread libdvdnav libbluray \
+  a52dec faac faad2 flac jasper lame libdca libmad libmpeg2 libtheora libvorbis libxv wavpack xvidcore aom dav1d libvpx opus \
+  mjpegtools speex twolame zvbi libdvbpsi projectm chromaprint libnfs libmicrodns srt
 ```
 
 ## Usługi systemowe
@@ -686,10 +691,12 @@ sudo systemctl enable --now cups.service avahi-daemon.service bluetooth.service
 ## Pakiety z AUR
 
 ```
-yay -S brother-dcp-b7520dw brscan4 brscan-skey brave-bin xpadneo-dkms plymouth-theme-arch-breeze-git
+yay -S brother-dcp-b7520dw brscan4 brscan-skey brave-bin xpadneo-dkms plymouth-theme-arch-breeze-git spotify
 ```
 
 `--needed` jest ważne, bo nie próbuje reinstalować pakietów, które już masz.
+
+> **Uwaga:** `spotify` z AUR instaluje pełnego klienta Spotify. Nie używaj `spotify-launcher` — ten pakiet jest tylko launcherem który dopiero pobiera Spotify i ma problemy z widocznością w menu KDE.
 
 ---
 
@@ -835,6 +842,8 @@ Po wykonaniu wszystkich kroków system ma:
 * Firefox
 * Thunderbird
 * Brave
+* Spotify
+* VLC z pełnym zestawem kodeków audio/wideo
 * Bluetooth w KDE
 * wsparcie dla AirPods Pro
 * `mpris-proxy.service` dla sterowania mediami po Bluetooth
