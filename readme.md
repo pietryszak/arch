@@ -1,31 +1,5 @@
 # Arch Linux na Dell Latitude 5421
 
-## Btrfs + Snapper + hibernacja + GRUB snapshoty + pełne Plasma + Plasma Login Manager
-
-Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421** z:
-
-* UEFI
-* Btrfs
-* snapshotami przez Snapper
-* osobnymi snapshotami dla `/` i `/home`
-* działającą hibernacją
-* GRUB + grub-btrfs do wybierania snapshotów z menu startowego
-* pełnym KDE Plasma przez `plasma-meta`
-* Plasma Login Manager zamiast SDDM
-* językiem systemu ustawionym na `en_US.UTF-8`
-* polską klawiaturą
-* strefą czasową `Europe/Warsaw`
-
-Docelowa konfiguracja:
-
-* dysk docelowy: `/dev/nvme0n1`
-* pełne wyczyszczenie dysku
-* brak szyfrowania
-* użytkownik: `pietryszak`
-* hostname: `arch`
-
-Ten układ zostawia **`/boot` na Btrfs**, a partycję EFI montuje jako **`/boot/efi`**. Dzięki temu kernel i initramfs pozostają na Btrfs i lepiej pasują do rollbacku snapshotów.
-
 ---
 
 # 1. Układ partycji
