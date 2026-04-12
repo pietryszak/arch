@@ -700,20 +700,7 @@ Dobra praktyka jest taka:
 ---
 # 27. Po instalacji: drukarka i skaner Brother DCP-B7520DW
 
-Dla KDE i urządzeń wielofunkcyjnych warto doinstalować:
-
-- CUPS
-- GUI do drukarek
-- wykrywanie urządzeń po sieci
-- warstwę skanera SANE
-
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to potrzebne pakiety są już zainstalowane, a `cups.service` i `avahi-daemon.service` są już włączone.
-
-To daje:
-
-- sterownik drukarki dla Brother DCP-B7520DW
-- sterownik skanera Brother
-- obsługę przycisku „Scan” z urządzenia
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to potrzebne pakiety są już zainstalowane.
 
 Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`.
 
@@ -734,41 +721,9 @@ Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
 ---
 
-# 29. Dodatkowe uwagi do Brothera
-
-Jeśli urządzenie nie zostanie wykryte automatycznie po sieci:
-
-1. sprawdź, czy drukarka i laptop są w tej samej sieci
-2. sprawdź, czy działa `cups.service`
-3. sprawdź, czy działa `avahi-daemon.service`
-4. sprawdź ręcznie, czy skaner odpowiada po `brsaneconfig4`
-5. przy problemach z przyciskiem „Scan” sprawdź, czy potrzebujesz `brscan-skey`
-
-Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
-
-- `cups`
-- `print-manager`
-- `system-config-printer`
-- `avahi`
-- `nss-mdns`
-- `sane`
-- `simple-scan`
-- `brother-dcp-b7520dw`
-- `brscan4`
-
----
-
-# 30. Po instalacji: przeglądarka i poczta
+# 29. Po instalacji: przeglądarka i poczta
 
 Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to pakiety do przeglądarki i poczty są już zainstalowane.
-
-To daje:
-
-- Firefox
-- Thunderbird
-- Brave
-
-`plasma-browser-integration` masz już z `plasma-meta`.
 
 Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
 
@@ -792,50 +747,31 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
----
+# 30. Po instalacji: Bluetooth w KDE
 
-# 31. Po instalacji: Bluetooth w KDE
+Przy `plasma-meta` masz już między innymi:
 
-Przy `plasma-meta` dostajesz już między innymi:
+- `kinfocenter`
+- `bluedevil`
 
-- `kinfocenter` — informacje o komputerze i systemie
-- `bluedevil` — integrację Bluetooth z KDE Plasma
-- `print-manager` — moduł drukarek dla KDE
-- `plasma-browser-integration`
-- `spectacle`
-- `plasma-pa`
-- `plasma-systemmonitor`
-
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to pakiety Bluetooth są już zainstalowane, a `bluetooth.service` jest już włączony.
-
-To daje:
-
-- `bluez` i `bluez-utils` — stos Bluetooth
-- `bluez-obex` — wysyłanie i odbieranie plików przez Bluetooth
-
-## AirPods Pro
-
-Dla słuchawek Bluetooth, takich jak AirPods Pro, obecny stos w tym README jest wystarczający:
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to masz już też:
 
 - `bluez`
 - `bluez-utils`
-- `bluedevil`
-- `pipewire`
-- `wireplumber`
+- `bluez-obex`
+- włączony `bluetooth.service`
 
-Nie trzeba dodawać osobnego sterownika tylko pod AirPods.
+## AirPods Pro
+
+Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
 
 ## Xbox pad po Bluetooth
 
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` są już zainstalowane.
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` masz już zainstalowane.
 
-To jest zalecane szczególnie dla kontrolerów Xbox One S i Xbox Series X|S po Bluetooth.
+Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
 
-Po instalacji najlepiej zrestartować system.
-
----
-
-# 32. Ładny splash screen Arch + motyw GRUB
+# 31. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -901,7 +837,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 33. Stan końcowy systemu
+# 32. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
