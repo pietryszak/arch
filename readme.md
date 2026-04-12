@@ -726,7 +726,9 @@ Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
 ---
 
-# 29.  Brave na KDE: trwałe obejście wolnego startu
+# 29. Po instalacji: przeglądarka i poczta
+
+## Brave na KDE: trwałe obejście wolnego startu
 
 Jeśli Brave uruchamia się bardzo długo na KDE Plasma, ustaw go na stałe z flagą `--password-store=basic`.
 
@@ -746,7 +748,31 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
-# 30. Ładny splash screen Arch + motyw GRUB
+# 30. Po instalacji: Bluetooth w KDE
+
+Przy `plasma-meta` masz już między innymi:
+
+- `kinfocenter`
+- `bluedevil`
+
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to masz już też:
+
+- `bluez`
+- `bluez-utils`
+- `bluez-obex`
+- włączony `bluetooth.service`
+
+## AirPods Pro
+
+Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
+
+## Xbox pad po Bluetooth
+
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` masz już zainstalowane.
+
+Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
+
+# 31. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -812,7 +838,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 31. Stan końcowy systemu
+# 32. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
