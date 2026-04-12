@@ -711,22 +711,7 @@ scanimage -L
 
 Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
-# 28. Konfiguracja skanera Brother po sieci
-
-Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
-
-Potem dodaj urządzenie do konfiguracji `brscan4`:
-
-```bash
-sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
-scanimage -L
-```
-
-Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
-
----
-
-# 29. Po instalacji: przeglądarka i poczta
+# 28. Po instalacji: przeglądarka i poczta
 
 ## Brave na KDE: trwałe obejście wolnego startu
 
@@ -748,31 +733,31 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
-# 30. Po instalacji: Bluetooth w KDE
-
-Przy `plasma-meta` masz już między innymi:
-
-- `kinfocenter`
-- `bluedevil`
-
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to masz już też:
-
-- `bluez`
-- `bluez-utils`
-- `bluez-obex`
-- włączony `bluetooth.service`
+# 29. Po instalacji: Bluetooth w KDE
 
 ## AirPods Pro
 
 Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
 
-## Xbox pad po Bluetooth
+Żeby działało sterowanie mediami z przycisków słuchawek, uruchom usługę użytkownika:
 
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` masz już zainstalowane.
+```bash
+systemctl --user enable --now mpris-proxy.service
+```
+
+Do testów MPRIS przydaje się też:
+
+```bash
+sudo pacman -S playerctl
+playerctl -l
+playerctl play-pause
+```
+
+## Xbox pad po Bluetooth
 
 Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
 
-# 31. Ładny splash screen Arch + motyw GRUB
+# 30. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -838,7 +823,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 32. Stan końcowy systemu
+# 31. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -869,6 +854,7 @@ Po wykonaniu wszystkich kroków system ma:
 - plasma-pa
 - plasma-systemmonitor
 - wsparcie dla AirPods Pro
+- mpris-proxy dla sterowania mediami po Bluetooth
 - xpadneo dla pada Xbox po Bluetooth
 - ładny motyw GRUB-a
 - splash screen Plymouth
