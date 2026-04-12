@@ -6,6 +6,7 @@ Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421*
 - UEFI
 - Btrfs
 - snapshotami przez Snapper
+- osobnymi snapshotami dla `/` i `/home`
 - działającą hibernacją
 - GRUB + grub-btrfs do wybierania snapshotów z menu startowego
 - minimalistycznym KDE Plasma
@@ -22,6 +23,8 @@ Docelowa konfiguracja:
 - użytkownik: `pietryszak`
 - hostname: `arch`
 
+Ten układ zostawia **`/boot` na Btrfs**, a partycję EFI montuje jako **`/boot/efi`**. Dzięki temu kernel i initramfs pozostają na Btrfs i lepiej pasują do rollbacku snapshotów.
+
 ---
 
 # Układ partycji
@@ -30,11 +33,31 @@ Docelowa konfiguracja:
 - `nvme0n1p2` — swap — `40 GiB`
 - `nvme0n1p3` — Btrfs — reszta dysku
 
-Subvolume Btrfs:
+---
 
-- `@`
-- `@home`
-- `@snapshots`
+# Układ subvolume
+
+Subvolume systemowe:
+
+- `@` -> `/`
+- `@home` -> `/home`
+- `@snapshots` -> `/.snapshots`
+- `@home_snapshots` -> `/home/.snapshots`
+- `@log` -> `/var/log`
+- `@cache` -> `/var/cache`
+- `@pkg` -> `/var/cache/pacman/pkg`
+- `@tmp` -> `/var/tmp`
+- `@spool` -> `/var/spool`
+- `@opt` -> `/opt`
+- `@libvirt` -> `/var/lib/libvirt`
+
+Subvolume użytkownika wyłączone z rollbacku `/home`:
+
+- `@mozilla` -> `/home/pietryszak/.mozilla`
+- `@brave` -> `/home/pietryszak/.config/BraveSoftware`
+- `@thunderbird` -> `/home/pietryszak/.thunderbird`
+- `@gnupg` -> `/home/pietryszak/.gnupg`
+- `@ssh` -> `/home/pietryszak/.ssh`
 
 ---
 
@@ -181,7 +204,7 @@ swapon /dev/nvme0n1p2
 mkfs.btrfs -f /dev/nvme0n1p3
 ```
 
-Tworzenie subvolume:
+Tworzenie wszystkich subvolume na top-level Btrfs:
 
 ```bash
 mount /dev/nvme0n1p3 /mnt
@@ -189,21 +212,51 @@ mount /dev/nvme0n1p3 /mnt
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
 btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@home_snapshots
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@cache
+btrfs subvolume create /mnt/@pkg
+btrfs subvolume create /mnt/@tmp
+btrfs subvolume create /mnt/@spool
+btrfs subvolume create /mnt/@opt
+btrfs subvolume create /mnt/@libvirt
+btrfs subvolume create /mnt/@mozilla
+btrfs subvolume create /mnt/@brave
+btrfs subvolume create /mnt/@thunderbird
+btrfs subvolume create /mnt/@gnupg
+btrfs subvolume create /mnt/@ssh
 
 umount /mnt
 ```
 
 ---
 
-# 7. Montowanie docelowego układu
+# 7. Montowanie docelowego układu systemowego
+
+Na tym etapie montujemy wszystko oprócz subvolume specyficznych dla użytkownika. Te zamontujemy dopiero po utworzeniu użytkownika.
 
 ```bash
 mount -o subvol=@,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt
-mkdir -p /mnt/{boot,home,.snapshots}
+
+mkdir -p /mnt/{boot/efi,home,.snapshots,opt}
+mkdir -p /mnt/home/.snapshots
+mkdir -p /mnt/var/log
+mkdir -p /mnt/var/cache/pacman/pkg
+mkdir -p /mnt/var/tmp
+mkdir -p /mnt/var/spool
+mkdir -p /mnt/var/lib/libvirt
 
 mount -o subvol=@home,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home
 mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshots
-mount /dev/nvme0n1p1 /mnt/boot
+mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/.snapshots
+mount -o subvol=@log,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/log
+mount -o subvol=@cache,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache
+mount -o subvol=@pkg,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache/pacman/pkg
+mount -o subvol=@tmp,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/tmp
+mount -o subvol=@spool,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/spool
+mount -o subvol=@opt,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/opt
+mount -o subvol=@libvirt,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/lib/libvirt
+mount /dev/nvme0n1p1 /mnt/boot/efi
 
 findmnt -R /mnt
 swapon --show
@@ -239,24 +292,7 @@ pacstrap -K /mnt \
 
 ---
 
-# 9. Generowanie fstab
-
-```bash
-genfstab -U /mnt > /mnt/etc/fstab
-cat /mnt/etc/fstab
-```
-
-Powinny pojawić się wpisy dla:
-
-- `/`
-- `/home`
-- `/.snapshots`
-- `/boot`
-- swap
-
----
-
-# 10. Podstawowa konfiguracja systemu
+# 9. Podstawowa konfiguracja systemu i utworzenie użytkownika
 
 Wejdź do chroota:
 
@@ -289,11 +325,6 @@ sed -i '/^# %wheel ALL=(ALL:ALL) ALL/s/^# //' /etc/sudoers
 useradd -m -G wheel -s /bin/bash pietryszak
 passwd
 passwd pietryszak
-
-systemctl enable NetworkManager
-systemctl enable sshd
-systemctl enable power-profiles-daemon
-systemctl enable plasmalogin.service
 ```
 
 Wyjdź z chroota:
@@ -304,7 +335,72 @@ exit
 
 ---
 
-# 11. Konfiguracja hibernacji
+# 10. Montowanie subvolume specyficznych dla użytkownika
+
+Teraz, gdy użytkownik już istnieje i ma poprawne `/home`, można zamontować subvolume wyłączone ze snapshotów `/home`.
+
+```bash
+mkdir -p /mnt/home/pietryszak/.config/BraveSoftware
+mkdir -p /mnt/home/pietryszak/.mozilla
+mkdir -p /mnt/home/pietryszak/.thunderbird
+mkdir -p /mnt/home/pietryszak/.gnupg
+mkdir -p /mnt/home/pietryszak/.ssh
+
+mount -o subvol=@mozilla,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.mozilla
+mount -o subvol=@brave,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.config/BraveSoftware
+mount -o subvol=@thunderbird,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.thunderbird
+mount -o subvol=@gnupg,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.gnupg
+mount -o subvol=@ssh,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.ssh
+```
+
+Nadaj właściciela i poprawne uprawnienia:
+
+```bash
+arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.mozilla
+arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.config/BraveSoftware
+arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.thunderbird
+arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.gnupg
+arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.ssh
+
+arch-chroot /mnt chmod 700 /home/pietryszak/.gnupg
+arch-chroot /mnt chmod 700 /home/pietryszak/.ssh
+```
+
+---
+
+# 11. Generowanie fstab
+
+Dopiero teraz, gdy wszystkie docelowe mountpointy są już zamontowane, generujemy finalny `fstab`.
+
+```bash
+genfstab -U /mnt > /mnt/etc/fstab
+cat /mnt/etc/fstab
+```
+
+Powinny pojawić się wpisy dla:
+
+- `/`
+- `/home`
+- `/.snapshots`
+- `/home/.snapshots`
+- `/var/log`
+- `/var/cache`
+- `/var/cache/pacman/pkg`
+- `/var/tmp`
+- `/var/spool`
+- `/opt`
+- `/var/lib/libvirt`
+- `/home/pietryszak/.mozilla`
+- `/home/pietryszak/.config/BraveSoftware`
+- `/home/pietryszak/.thunderbird`
+- `/home/pietryszak/.gnupg`
+- `/home/pietryszak/.ssh`
+- `/boot/efi`
+- swap
+
+---
+
+# 12. Konfiguracja hibernacji
 
 Ustawienie `resume=UUID=...` dla GRUB i hooka `resume` w `mkinitcpio`:
 
@@ -324,9 +420,9 @@ EOF
 
 ---
 
-# 12. Konfiguracja Snappera
+# 13. Konfiguracja Snappera dla `/`
 
-## 12.1 Utworzenie konfiguracji Snappera bez D-Bus
+## 13.1 Utworzenie konfiguracji root bez D-Bus
 
 > W chroocie trzeba użyć `--no-dbus`, bo bez tego Snapper może wywalić błąd `org.freedesktop.DBus.Error.ServiceUnknown`.
 
@@ -337,7 +433,7 @@ rmdir /mnt/.snapshots
 arch-chroot /mnt snapper --no-dbus -c root create-config /
 ```
 
-## 12.2 Usunięcie `/.snapshots` utworzonego w `@` i podpięcie własnego `@snapshots`
+## 13.2 Usunięcie `/.snapshots` utworzonego w `@` i ponowne podpięcie dedykowanego `@snapshots`
 
 ```bash
 mkdir -p /mnt/.btrfs-root
@@ -352,7 +448,39 @@ mkdir -p /mnt/.snapshots
 mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshots
 ```
 
-## 12.3 Włączenie timeline i cleanup
+---
+
+# 14. Konfiguracja Snappera dla `/home`
+
+## 14.1 Utworzenie konfiguracji home bez D-Bus
+
+```bash
+umount /mnt/home/.snapshots
+rmdir /mnt/home/.snapshots
+
+arch-chroot /mnt snapper --no-dbus -c home create-config /home
+```
+
+## 14.2 Usunięcie `/home/.snapshots` utworzonego w `@home` i ponowne podpięcie dedykowanego `@home_snapshots`
+
+```bash
+mkdir -p /mnt/.btrfs-root
+mount -o subvolid=5 /dev/nvme0n1p3 /mnt/.btrfs-root
+
+btrfs subvolume delete /mnt/.btrfs-root/@home/.snapshots
+
+umount /mnt/.btrfs-root
+rmdir /mnt/.btrfs-root
+
+mkdir -p /mnt/home/.snapshots
+mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/.snapshots
+```
+
+---
+
+# 15. Włączenie timeline i cleanup dla Snappera
+
+Ustawienia dla `root`:
 
 ```bash
 arch-chroot /mnt sed -i \
@@ -368,32 +496,61 @@ arch-chroot /mnt sed -i \
   -e 's/^TIMELINE_LIMIT_YEARLY=.*/TIMELINE_LIMIT_YEARLY="0"/' \
   -e 's/^EMPTY_PRE_POST_CLEANUP=.*/EMPTY_PRE_POST_CLEANUP="yes"/' \
   /etc/snapper/configs/root
+```
 
+Ustawienia dla `home`:
+
+```bash
+arch-chroot /mnt sed -i \
+  -e 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="yes"/' \
+  -e 's/^TIMELINE_CLEANUP=.*/TIMELINE_CLEANUP="yes"/' \
+  -e 's/^NUMBER_CLEANUP=.*/NUMBER_CLEANUP="yes"/' \
+  -e 's/^NUMBER_LIMIT=.*/NUMBER_LIMIT="10"/' \
+  -e 's/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' \
+  -e 's/^TIMELINE_LIMIT_HOURLY=.*/TIMELINE_LIMIT_HOURLY="10"/' \
+  -e 's/^TIMELINE_LIMIT_DAILY=.*/TIMELINE_LIMIT_DAILY="7"/' \
+  -e 's/^TIMELINE_LIMIT_WEEKLY=.*/TIMELINE_LIMIT_WEEKLY="4"/' \
+  -e 's/^TIMELINE_LIMIT_MONTHLY=.*/TIMELINE_LIMIT_MONTHLY="3"/' \
+  -e 's/^TIMELINE_LIMIT_YEARLY=.*/TIMELINE_LIMIT_YEARLY="0"/' \
+  -e 's/^EMPTY_PRE_POST_CLEANUP=.*/EMPTY_PRE_POST_CLEANUP="yes"/' \
+  /etc/snapper/configs/home
+```
+
+Włączenie timerów i utworzenie pierwszych snapshotów:
+
+```bash
 arch-chroot /mnt systemctl enable snapper-timeline.timer
 arch-chroot /mnt systemctl enable snapper-cleanup.timer
 
-arch-chroot /mnt snapper --no-dbus -c root create -d "fresh-install"
+arch-chroot /mnt snapper --no-dbus -c root create -d "fresh-install-root"
+arch-chroot /mnt snapper --no-dbus -c home create -d "fresh-install-home"
+
 arch-chroot /mnt snapper --no-dbus -c root list
+arch-chroot /mnt snapper --no-dbus -c home list
 ```
 
 ---
 
-# 13. Instalacja GRUB i integracja snapshotów
+# 16. Instalacja GRUB i integracja snapshotów
 
 ```bash
 arch-chroot /mnt /bin/bash <<'EOF'
 set -e
 
-grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 
 systemctl enable grub-btrfsd.service
+systemctl enable NetworkManager
+systemctl enable sshd
+systemctl enable power-profiles-daemon
+systemctl enable plasmalogin.service
 EOF
 ```
 
 ---
 
-# 14. Ostatnia kontrola przed restartem
+# 17. Ostatnia kontrola przed restartem
 
 ```bash
 arch-chroot /mnt cat /etc/locale.conf
@@ -404,6 +561,7 @@ arch-chroot /mnt grep HOOKS /etc/mkinitcpio.conf
 arch-chroot /mnt systemctl is-enabled plasmalogin.service
 arch-chroot /mnt systemctl is-enabled grub-btrfsd.service
 arch-chroot /mnt snapper --no-dbus -c root list
+arch-chroot /mnt snapper --no-dbus -c home list
 ```
 
 Powinno wyjść mniej więcej:
@@ -415,11 +573,12 @@ Powinno wyjść mniej więcej:
 - `resume` w HOOKS
 - `plasmalogin.service` = `enabled`
 - `grub-btrfsd.service` = `enabled`
-- snapshot `fresh-install`
+- snapshot `fresh-install-root`
+- snapshot `fresh-install-home`
 
 ---
 
-# 15. Restart
+# 18. Restart
 
 ```bash
 umount -R /mnt
@@ -431,7 +590,7 @@ Wyjmij pendrive instalacyjny.
 
 ---
 
-# 16. Kontrola po pierwszym starcie
+# 19. Kontrola po pierwszym starcie
 
 Po zalogowaniu do zainstalowanego systemu:
 
@@ -439,6 +598,7 @@ Po zalogowaniu do zainstalowanego systemu:
 cat /proc/cmdline
 swapon --show
 snapper -c root list
+snapper -c home list
 systemctl status grub-btrfsd.service --no-pager
 grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
 ```
@@ -447,12 +607,13 @@ To potwierdza:
 
 - aktywne `resume=UUID=...`
 - aktywny swap
-- działającego Snappera
+- działającego Snappera dla `/`
+- działającego Snappera dla `/home`
 - działające submenu snapshotów w GRUB-ie
 
 ---
 
-# 17. Test hibernacji
+# 20. Test hibernacji
 
 Najprostszy test:
 
@@ -462,18 +623,21 @@ sudo systemctl hibernate
 
 ---
 
-# 18. Snapshot po udanej instalacji
+# 21. Snapshot bazowy po udanej instalacji
 
 Po pierwszym poprawnym starcie dobrze od razu zrobić snapshot bazowy:
 
 ```bash
-sudo snapper -c root create -d "working-base"
+sudo snapper -c root create -d "working-base-root"
+sudo snapper -c home create -d "working-base-home"
+
 sudo snapper -c root list
+sudo snapper -c home list
 ```
 
 ---
 
-# 19. Opcjonalnie: wymuszenie polskiego układu klawiatury dla GUI
+# 22. Opcjonalnie: wymuszenie polskiego układu klawiatury dla GUI
 
 Jeśli chcesz dodatkowo ustawić układ X11/GUI na polski:
 
@@ -483,13 +647,13 @@ sudo localectl --no-convert set-x11-keymap pl
 
 ---
 
-# 20. Stan końcowy systemu
+# 23. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
 - Arch Linux
 - Btrfs
-- snapshoty przez Snapper
+- snapshoty przez Snapper dla `/` i `/home`
 - automatyczne snapshoty pacmana przez `snap-pac`
 - GRUB z menu snapshotów dzięki `grub-btrfs`
 - działającą hibernację
@@ -501,3 +665,13 @@ Po wykonaniu wszystkich kroków system ma:
 - strefę `Europe/Warsaw`
 - `neovim`
 - `wget`, `git`, `curl`, `btop`, `fastfetch`
+
+Dodatkowo rollback `/home` nie będzie ruszał:
+
+- Firefoksa
+- Brave
+- Thunderbirda
+- kluczy GPG
+- kluczy SSH
+
+bo te katalogi mają własne subvolume poza snapshotami `@home`.
