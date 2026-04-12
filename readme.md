@@ -579,12 +579,12 @@ Wyjmij pendrive instalacyjny.
 Po zalogowaniu do zainstalowanego systemu:
 
 ```bash
-cat /proc/cmdline
-swapon --show
-snapper -c root list
-snapper -c home list
-systemctl status grub-btrfsd.service --no-pager
-grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
+sudo cat /proc/cmdline
+sudo swapon --show
+sudo snapper -c root list
+sudo snapper -c home list
+sudo systemctl status grub-btrfsd.service --no-pager
+sudo grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
 ```
 
 To potwierdza:
@@ -749,6 +749,26 @@ To daje:
 - integrację przeglądarki z KDE Plasma
 
 Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
+
+## Brave na KDE: trwałe obejście wolnego startu
+
+Jeśli Brave uruchamia się bardzo długo na KDE Plasma, ustaw go na stałe z flagą `--password-store=basic`.
+
+Najpierw utwórz lokalny wpis `.desktop`:
+
+```bash
+mkdir -p ~/.local/share/applications
+cp /usr/share/applications/brave-browser.desktop ~/.local/share/applications/
+```
+
+Potem podmień linię `Exec=`:
+
+```bash
+sed -i 's|^Exec=.*|Exec=brave --password-store=basic %U|' ~/.local/share/applications/brave-browser.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
 ---
 
