@@ -10,7 +10,7 @@ Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421*
 - osobnymi snapshotami dla `/` i `/home`
 - działającą hibernacją
 - GRUB + grub-btrfs do wybierania snapshotów z menu startowego
-- minimalistycznym KDE Plasma
+- pełnym KDE Plasma przez `plasma-meta`
 - Plasma Login Manager zamiast SDDM
 - językiem systemu ustawionym na `en_US.UTF-8`
 - polską klawiaturą
@@ -253,8 +253,7 @@ Instalujemy:
 - GRUB
 - sieć
 - PipeWire
-- minimalne KDE
-- Plasma Login Manager
+- pełne KDE Plasma przez `plasma-meta`
 - Snapper
 - grub-btrfs
 - dodatkowe narzędzia
@@ -265,12 +264,13 @@ pacstrap -K /mnt \
   grub efibootmgr \
   networkmanager openssh sudo neovim bash-completion wget git curl btop fastfetch man-db man-pages \
   pipewire-audio pipewire-alsa pipewire-pulse wireplumber sof-firmware \
-  plasma-desktop plasma-login-manager plasma-nm polkit-kde-agent \
+  plasma-meta \
   dolphin konsole \
-  xdg-user-dirs xdg-desktop-portal xdg-desktop-portal-kde power-profiles-daemon \
+  xdg-user-dirs xdg-desktop-portal power-profiles-daemon \
   snapper grub-btrfs inotify-tools
 ```
 
+> **Uwaga:** `plasma-meta` dociąga pełny zestaw komponentów Plasma, więc instalacja będzie wyraźnie większa niż przy ręcznie skrojonym, minimalnym zestawie.  
 > **Uwaga:** podczas `pacstrap` może pojawić się ostrzeżenie z `mkinitcpio` o brakującym `/etc/vconsole.conf`.  
 > To jest normalne na tym etapie, bo plik zostanie utworzony dopiero w późniejszej konfiguracji systemu.  
 > Właściwe `mkinitcpio -P` i tak wykonujesz później, już po ustawieniu locale, keymap i hibernacji.
@@ -737,7 +737,7 @@ Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
 Jeśli chcesz od razu doinstalować podstawowe aplikacje użytkowe, zainstaluj:
 
 ```bash
-sudo pacman -S firefox thunderbird plasma-browser-integration
+sudo pacman -S firefox thunderbird
 yay -S brave-bin
 ```
 
@@ -746,7 +746,8 @@ To daje:
 - Firefox
 - Thunderbird
 - Brave
-- integrację przeglądarki z KDE Plasma
+
+`plasma-browser-integration` masz już z `plasma-meta`.
 
 Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
 
@@ -773,23 +774,29 @@ Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-st
 ---
 
 
-# 30. Po instalacji: informacje o systemie i Bluetooth w KDE
+# 30. Po instalacji: Bluetooth w KDE
 
-Jeśli w KDE nie widzisz „Informacji o systemie / O komputerze” albo nie masz obsługi Bluetooth, doinstaluj:
+Przy `plasma-meta` dostajesz już między innymi:
+
+- `kinfocenter` — informacje o komputerze i systemie
+- `bluedevil` — integrację Bluetooth z KDE Plasma
+- `print-manager` — moduł drukarek dla KDE
+- `plasma-browser-integration`
+- `spectacle`
+- `plasma-pa`
+- `plasma-systemmonitor`
+
+Do samego stosu Bluetooth nadal warto doinstalować:
 
 ```bash
-sudo pacman -S kinfocenter bluez bluez-utils bluedevil bluez-obex
+sudo pacman -S bluez bluez-utils bluez-obex
 sudo systemctl enable --now bluetooth.service
 ```
 
 To daje:
 
-- `kinfocenter` — informacje o komputerze i systemie
 - `bluez` i `bluez-utils` — stos Bluetooth
-- `bluedevil` — integrację Bluetooth z KDE Plasma
 - `bluez-obex` — wysyłanie i odbieranie plików przez Bluetooth
-
-Po instalacji Bluetooth w KDE powinien pojawić się normalnie w ustawieniach i w zasobniku systemowym.
 
 ## AirPods Pro
 
@@ -900,7 +907,7 @@ Po wykonaniu wszystkich kroków system ma:
 - automatyczne snapshoty pacmana przez `snap-pac`
 - GRUB z menu snapshotów dzięki `grub-btrfs`
 - działającą hibernację
-- minimalne KDE Plasma
+- pełne KDE Plasma przez `plasma-meta`
 - Plasma Login Manager
 - hostname `arch`
 - `en_US.UTF-8`
@@ -915,6 +922,11 @@ Po wykonaniu wszystkich kroków system ma:
 - Brave
 - kinfocenter
 - Bluetooth w KDE
+- print-manager
+- plasma-browser-integration
+- spectacle
+- plasma-pa
+- plasma-systemmonitor
 - wsparcie dla AirPods Pro
 - xpadneo dla pada Xbox po Bluetooth
 - ładny motyw GRUB-a
