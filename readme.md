@@ -700,11 +700,16 @@ Dobra praktyka jest taka:
 ---
 # 27. Po instalacji: drukarka i skaner Brother DCP-B7520DW
 
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to potrzebne pakiety są już zainstalowane.
+Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
 
-Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`.
+Dodaj urządzenie do konfiguracji `brscan4`:
 
----
+```bash
+sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
+scanimage -L
+```
+
+Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
 # 28. Konfiguracja skanera Brother po sieci
 
