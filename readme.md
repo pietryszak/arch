@@ -127,9 +127,36 @@ ssh root@ADRES_IP
 
 ---
 
+# 3. Zabezpieczenie sesji SSH przed zerwaniem przez tmux
+
+Od razu po zalogowaniu po SSH zainstaluj i uruchom `tmux`:
+
+```bash
+pacman -Sy --noconfirm tmux
+tmux new -A -s arch
+```
+
+Od tej chwili wykonuj całą instalację **wewnątrz `tmux`**.
+
+Jeśli SSH się zerwie:
+
+```bash
+ssh root@ADRES_IP
+tmux attach -t arch
+```
+
+Przydatne skróty:
+
+```text
+Ctrl+b d   odłączenie sesji bez jej zabijania
+Ctrl+b c   nowe okno
+Ctrl+b n   następne okno
+Ctrl+b p   poprzednie okno
+```
+
 ---
 
-# 3. Sprawdzenie trybu bootu i dysków
+# 4. Sprawdzenie trybu bootu i dysków
 
 ```bash
 ls /sys/firmware/efi/efivars >/dev/null && echo UEFI_OK || echo NIE_UEFI
@@ -145,7 +172,7 @@ Ten przewodnik zakłada, że:
 
 ---
 
-# 4. Partycjonowanie dysku
+# 5. Partycjonowanie dysku
 
 > **Uwaga:** ten krok kasuje cały `/dev/nvme0n1`.
 
@@ -168,7 +195,7 @@ lsblk -f /dev/nvme0n1
 
 ---
 
-# 5. Formatowanie i tworzenie subvolume Btrfs
+# 6. Formatowanie i tworzenie subvolume Btrfs
 
 ```bash
 mkfs.fat -F32 /dev/nvme0n1p1
@@ -204,31 +231,39 @@ umount /mnt
 
 ---
 
-# 6. Montowanie docelowego układu systemowego
+# 7. Montowanie docelowego układu systemowego
 
 Na tym etapie montujemy wszystko oprócz subvolume specyficznych dla użytkownika. Te zamontujemy dopiero po utworzeniu użytkownika.
+
+Ważna kolejność:
+- najpierw montujesz główne subvolume, takie jak `@home` i `@cache`
+- dopiero potem tworzysz katalogi wewnątrz nich, takie jak `/home/.snapshots` i `/var/cache/pacman/pkg`
+- na końcu montujesz `@home_snapshots` i `@pkg`
 
 ```bash
 mount -o subvol=@,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt
 
 mkdir -p /mnt/{boot/efi,home,.snapshots,opt}
-mkdir -p /mnt/home/.snapshots
 mkdir -p /mnt/var/log
-mkdir -p /mnt/var/cache/pacman/pkg
+mkdir -p /mnt/var/cache
 mkdir -p /mnt/var/tmp
 mkdir -p /mnt/var/spool
 mkdir -p /mnt/var/lib/libvirt
 
 mount -o subvol=@home,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home
 mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshots
-mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/.snapshots
 mount -o subvol=@log,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/log
 mount -o subvol=@cache,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache
-mount -o subvol=@pkg,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache/pacman/pkg
 mount -o subvol=@tmp,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/tmp
 mount -o subvol=@spool,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/spool
 mount -o subvol=@opt,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/opt
 mount -o subvol=@libvirt,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/lib/libvirt
+
+mkdir -p /mnt/home/.snapshots
+mkdir -p /mnt/var/cache/pacman/pkg
+
+mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/.snapshots
+mount -o subvol=@pkg,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache/pacman/pkg
 mount /dev/nvme0n1p1 /mnt/boot/efi
 
 findmnt -R /mnt
@@ -236,8 +271,7 @@ swapon --show
 ```
 
 ---
-
-# 7. Instalacja pakietów
+# 8. Instalacja pakietów
 
 Instalujemy:
 
@@ -265,7 +299,7 @@ pacstrap -K /mnt \
 
 ---
 
-# 8. Podstawowa konfiguracja systemu i utworzenie użytkownika
+# 9. Podstawowa konfiguracja systemu i utworzenie użytkownika
 
 Wejdź do chroota:
 
@@ -308,7 +342,7 @@ exit
 
 ---
 
-# 9. Montowanie subvolume specyficznych dla użytkownika
+# 10. Montowanie subvolume specyficznych dla użytkownika
 
 Teraz, gdy użytkownik już istnieje i ma poprawne `/home`, można zamontować subvolume wyłączone ze snapshotów `/home`.
 
@@ -341,7 +375,7 @@ arch-chroot /mnt chmod 700 /home/pietryszak/.ssh
 
 ---
 
-# 10. Generowanie fstab
+# 11. Generowanie fstab
 
 Dopiero teraz, gdy wszystkie docelowe mountpointy są już zamontowane, generujemy finalny `fstab`.
 
@@ -373,7 +407,7 @@ Powinny pojawić się wpisy dla:
 
 ---
 
-# 11. Konfiguracja hibernacji
+# 12. Konfiguracja hibernacji
 
 Ustawienie `resume=UUID=...` dla GRUB i hooka `resume` w `mkinitcpio`:
 
@@ -393,7 +427,7 @@ EOF
 
 ---
 
-# 12. Konfiguracja Snappera dla `/`
+# 13. Konfiguracja Snappera dla `/`
 
 ## 13.1 Utworzenie konfiguracji root bez D-Bus
 
@@ -423,7 +457,7 @@ mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshot
 
 ---
 
-# 13. Konfiguracja Snappera dla `/home`
+# 14. Konfiguracja Snappera dla `/home`
 
 ## 14.1 Utworzenie konfiguracji home bez D-Bus
 
@@ -451,7 +485,7 @@ mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home
 
 ---
 
-# 14. Włączenie timeline i cleanup dla Snappera
+# 15. Włączenie timeline i cleanup dla Snappera
 
 Ustawienia dla `root`:
 
@@ -504,7 +538,7 @@ arch-chroot /mnt snapper --no-dbus -c home list
 
 ---
 
-# 15. Instalacja GRUB i integracja snapshotów
+# 16. Instalacja GRUB i integracja snapshotów
 
 ```bash
 arch-chroot /mnt /bin/bash <<'EOF'
@@ -523,7 +557,7 @@ EOF
 
 ---
 
-# 16. Ostatnia kontrola przed restartem
+# 17. Ostatnia kontrola przed restartem
 
 ```bash
 arch-chroot /mnt cat /etc/locale.conf
@@ -551,7 +585,7 @@ Powinno wyjść mniej więcej:
 
 ---
 
-# 17. Restart
+# 18. Restart
 
 ```bash
 umount -R /mnt
@@ -563,7 +597,7 @@ Wyjmij pendrive instalacyjny.
 
 ---
 
-# 18. Kontrola po pierwszym starcie
+# 19. Kontrola po pierwszym starcie
 
 Po zalogowaniu do zainstalowanego systemu:
 
@@ -586,7 +620,7 @@ To potwierdza:
 
 ---
 
-# 19. Test hibernacji
+# 20. Test hibernacji
 
 Najprostszy test:
 
@@ -596,7 +630,7 @@ sudo systemctl hibernate
 
 ---
 
-# 20. Snapshot bazowy po udanej instalacji
+# 21. Snapshot bazowy po udanej instalacji
 
 Po pierwszym poprawnym starcie dobrze od razu zrobić snapshot bazowy:
 
@@ -610,7 +644,7 @@ sudo snapper -c home list
 
 ---
 
-# 21. Opcjonalnie: wymuszenie polskiego układu klawiatury dla GUI
+# 22. Opcjonalnie: wymuszenie polskiego układu klawiatury dla GUI
 
 Jeśli chcesz dodatkowo ustawić układ X11/GUI na polski:
 
@@ -622,7 +656,7 @@ sudo localectl --no-convert set-x11-keymap pl
 
 ---
 
-# 23. Po instalacji: narzędzia deweloperskie i `yay`
+# 24. Po instalacji: narzędzia deweloperskie i `yay`
 
 `git`, `wget` i `curl` są już instalowane w bazowym `pacstrap`, ale do budowania pakietów z AUR potrzebujesz jeszcze `base-devel`.
 
@@ -652,7 +686,7 @@ mkdir -p ~/.gc
 
 ---
 
-# 24. Po instalacji: drukarka i skaner Brother DCP-B7520DW
+# 25. Po instalacji: drukarka i skaner Brother DCP-B7520DW
 
 Dla KDE i urządzeń wielofunkcyjnych warto doinstalować:
 
@@ -684,7 +718,7 @@ Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`
 
 ---
 
-# 25. Konfiguracja skanera Brother po sieci
+# 26. Konfiguracja skanera Brother po sieci
 
 Najpierw ustal adres IP drukarki/skanera w sieci lokalnej.
 
@@ -699,7 +733,7 @@ Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
 ---
 
-# 26. Dodatkowe uwagi do Brothera
+# 27. Dodatkowe uwagi do Brothera
 
 Jeśli urządzenie nie zostanie wykryte automatycznie po sieci:
 
@@ -723,106 +757,7 @@ Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
 
 ---
 
-# 27. Po instalacji: przeglądarka i poczta
-
-Jeśli chcesz od razu doinstalować podstawowe aplikacje użytkowe, zainstaluj:
-
-```bash
-sudo pacman -S firefox thunderbird plasma-browser-integration
-yay -S brave-bin
-```
-
-To daje:
-
-- Firefox
-- Thunderbird
-- Brave
-- integrację przeglądarki z KDE Plasma
-
-Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
-
----
-
----
-
-# 28. Ładny splash screen Arch + motyw GRUB
-
-Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
-
-- `breeze-grub` dla estetycznego GRUB-a
-- `plymouth` jako splash screen przy starcie
-- motyw `plymouth-theme-arch-breeze-git` z AUR
-
-Instalacja:
-
-```bash
-sudo pacman -S plymouth plymouth-kcm breeze-grub
-yay -S plymouth-theme-arch-breeze-git
-```
-
-Ustawienie motywu Plymouth:
-
-```bash
-sudo plymouth-set-default-theme -R arch-breeze
-```
-
-Konfiguracja GRUB-a:
-
-Otwórz plik:
-
-```bash
-sudo nvim /etc/default/grub
-```
-
-Upewnij się, że linia wygląda mniej więcej tak:
-
-```bash
-GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet splash resume=UUID=TWOJ_SWAP_UUID"
-GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"
-```
-
-Jeśli masz już ustawione `resume=UUID=...`, po prostu dopisz `splash` i dodaj linię `GRUB_THEME=...`.
-
-Konfiguracja `mkinitcpio`:
-
-Otwórz plik:
-
-```bash
-sudo nvim /etc/mkinitcpio.conf
-```
-
-Dodaj hook `plymouth` przed `filesystems`.
-
-Przykład:
-
-```bash
-HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block plymouth filesystems resume fsck)
-```
-
-Potem przebuduj initramfs i GRUB:
-
-```bash
-sudo mkinitcpio -P
-sudo grub-mkconfig -o /boot/grub/grub.cfg
-```
-
-Po restarcie system powinien pokazywać:
-
-- estetyczny motyw GRUB-a
-- splash screen Plymouth w stylu Arch + Breeze
-
-Gdybyś kiedyś chciał wrócić do zwykłego Breeze, użyj:
-
-```bash
-sudo pacman -S breeze-plymouth
-sudo plymouth-set-default-theme -R breeze
-```
-
----
-
----
-
-# 29. Stan końcowy systemu
+# 28. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -842,9 +777,6 @@ Po wykonaniu wszystkich kroków system ma:
 - `wget`, `git`, `curl`, `btop`, `fastfetch`
 - `yay`
 - obsługę drukarki i skanera Brother DCP-B7520DW
-- Firefox
-- Thunderbird
-- Brave
 
 Dodatkowo rollback `/home` nie będzie ruszał:
 
@@ -855,7 +787,3 @@ Dodatkowo rollback `/home` nie będzie ruszał:
 - kluczy SSH
 
 bo te katalogi mają własne subvolume poza snapshotami `@home`.
----
-- ładny motyw GRUB-a
-- splash screen Plymouth
-- motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
