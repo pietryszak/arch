@@ -772,7 +772,28 @@ Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-st
 
 ---
 
-# 30. Ładny splash screen Arch + motyw GRUB
+
+# 30. Po instalacji: informacje o systemie i Bluetooth w KDE
+
+Jeśli w KDE nie widzisz „Informacji o systemie / O komputerze” albo nie masz obsługi Bluetooth, doinstaluj:
+
+```bash
+sudo pacman -S kinfocenter bluez bluez-utils bluedevil bluez-obex
+sudo systemctl enable --now bluetooth.service
+```
+
+To daje:
+
+- `kinfocenter` — informacje o komputerze i systemie
+- `bluez` i `bluez-utils` — stos Bluetooth
+- `bluedevil` — integrację Bluetooth z KDE Plasma
+- `bluez-obex` — wysyłanie i odbieranie plików przez Bluetooth
+
+Po instalacji Bluetooth w KDE powinien pojawić się normalnie w ustawieniach i w zasobniku systemowym.
+
+---
+
+# 31. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -843,7 +864,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 31. Stan końcowy systemu
+# 32. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -866,6 +887,8 @@ Po wykonaniu wszystkich kroków system ma:
 - Firefox
 - Thunderbird
 - Brave
+- kinfocenter
+- Bluetooth w KDE
 - ładny motyw GRUB-a
 - splash screen Plymouth
 - motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
