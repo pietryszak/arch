@@ -791,6 +791,32 @@ To daje:
 
 Po instalacji Bluetooth w KDE powinien pojawić się normalnie w ustawieniach i w zasobniku systemowym.
 
+## AirPods Pro
+
+Dla słuchawek Bluetooth, takich jak AirPods Pro, obecny stos w tym README jest wystarczający:
+
+- `bluez`
+- `bluez-utils`
+- `bluedevil`
+- `pipewire`
+- `wireplumber`
+
+Nie trzeba dodawać osobnego sterownika tylko pod AirPods.
+
+## Xbox pad po Bluetooth
+
+Jeśli chcesz używać pada Xbox po Bluetooth, doinstaluj jeszcze:
+
+```bash
+sudo pacman -S linux-headers dkms
+yay -S xpadneo-dkms
+```
+
+To jest zalecane szczególnie dla kontrolerów Xbox One S i Xbox Series X|S po Bluetooth.
+
+Po instalacji najlepiej zrestartować system.
+
+
 ---
 
 # 31. Ładny splash screen Arch + motyw GRUB
@@ -889,6 +915,8 @@ Po wykonaniu wszystkich kroków system ma:
 - Brave
 - kinfocenter
 - Bluetooth w KDE
+- wsparcie dla AirPods Pro
+- xpadneo dla pada Xbox po Bluetooth
 - ładny motyw GRUB-a
 - splash screen Plymouth
 - motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
