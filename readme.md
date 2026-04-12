@@ -705,7 +705,7 @@ Najpierw ustal adres IP drukarki/skanera w sieci lokalnej.
 Potem dodaj urządzenie do konfiguracji `brscan4`:
 
 ```bash
-sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=IP_DRUKARKI
+sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
 scanimage -L
 ```
 
