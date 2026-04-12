@@ -661,7 +661,44 @@ mkdir -p ~/.gc
 
 ---
 
-# 26. Po instalacji: drukarka i skaner Brother DCP-B7520DW
+# 26. Po instalacji: szybka zbiorcza instalacja pakietów
+
+Jeśli wolisz zainstalować większość dodatkowych pakietów jednym strzałem po pierwszym starcie systemu, możesz użyć takiego wariantu.
+
+To jest sekcja zbiorcza. Jeśli użyjesz jej w całości, w dalszych sekcjach nie musisz już powtarzać instalacji tych samych pakietów — zostają tam tylko konfiguracje i wyjaśnienia.
+
+## Pakiety z oficjalnych repozytoriów
+
+```bash
+sudo pacman -S --needed \
+  cups system-config-printer avahi nss-mdns sane simple-scan \
+  firefox thunderbird \
+  bluez bluez-utils bluez-obex \
+  linux-headers dkms \
+  plymouth plymouth-kcm breeze-grub
+```
+
+## Usługi systemowe
+
+```bash
+sudo systemctl enable --now cups.service avahi-daemon.service bluetooth.service
+```
+
+## Pakiety z AUR
+
+```bash
+yay -S brother-dcp-b7520dw brscan4 brscan-skey brave-bin xpadneo-dkms plymouth-theme-arch-breeze-git
+```
+
+Dobra praktyka jest taka:
+- w README trzymać pakiety w osobnych sekcjach tematycznych, bo łatwiej zrozumieć po co są
+- w praktyce instalować pakiety z oficjalnych repo jedną komendą `pacman -S --needed`
+- pakiety z AUR robić osobno przez `yay`
+
+`--needed` jest ważne, bo nie próbuje reinstalować pakietów, które już masz.
+
+---
+# 27. Po instalacji: drukarka i skaner Brother DCP-B7520DW
 
 Dla KDE i urządzeń wielofunkcyjnych warto doinstalować:
 
@@ -670,18 +707,7 @@ Dla KDE i urządzeń wielofunkcyjnych warto doinstalować:
 - wykrywanie urządzeń po sieci
 - warstwę skanera SANE
 
-Zainstaluj pakiety z repozytoriów:
-
-```bash
-sudo pacman -S cups print-manager system-config-printer avahi nss-mdns sane simple-scan
-sudo systemctl enable --now cups.service avahi-daemon.service
-```
-
-Następnie doinstaluj pakiety Brothera z AUR:
-
-```bash
-yay -S brother-dcp-b7520dw brscan4 brscan-skey
-```
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to potrzebne pakiety są już zainstalowane, a `cups.service` i `avahi-daemon.service` są już włączone.
 
 To daje:
 
@@ -693,7 +719,7 @@ Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`
 
 ---
 
-# 27. Konfiguracja skanera Brother po sieci
+# 28. Konfiguracja skanera Brother po sieci
 
 Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
 
@@ -708,7 +734,7 @@ Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
 ---
 
-# 28. Dodatkowe uwagi do Brothera
+# 29. Dodatkowe uwagi do Brothera
 
 Jeśli urządzenie nie zostanie wykryte automatycznie po sieci:
 
@@ -732,14 +758,9 @@ Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
 
 ---
 
-# 29. Po instalacji: przeglądarka i poczta
+# 30. Po instalacji: przeglądarka i poczta
 
-Jeśli chcesz od razu doinstalować podstawowe aplikacje użytkowe, zainstaluj:
-
-```bash
-sudo pacman -S firefox thunderbird
-yay -S brave-bin
-```
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to pakiety do przeglądarki i poczty są już zainstalowane.
 
 To daje:
 
@@ -773,8 +794,7 @@ Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-st
 
 ---
 
-
-# 30. Po instalacji: Bluetooth w KDE
+# 31. Po instalacji: Bluetooth w KDE
 
 Przy `plasma-meta` dostajesz już między innymi:
 
@@ -786,12 +806,7 @@ Przy `plasma-meta` dostajesz już między innymi:
 - `plasma-pa`
 - `plasma-systemmonitor`
 
-Do samego stosu Bluetooth nadal warto doinstalować:
-
-```bash
-sudo pacman -S bluez bluez-utils bluez-obex
-sudo systemctl enable --now bluetooth.service
-```
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to pakiety Bluetooth są już zainstalowane, a `bluetooth.service` jest już włączony.
 
 To daje:
 
@@ -812,21 +827,15 @@ Nie trzeba dodawać osobnego sterownika tylko pod AirPods.
 
 ## Xbox pad po Bluetooth
 
-Jeśli chcesz używać pada Xbox po Bluetooth, doinstaluj jeszcze:
-
-```bash
-sudo pacman -S linux-headers dkms
-yay -S xpadneo-dkms
-```
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` są już zainstalowane.
 
 To jest zalecane szczególnie dla kontrolerów Xbox One S i Xbox Series X|S po Bluetooth.
 
 Po instalacji najlepiej zrestartować system.
 
-
 ---
 
-# 31. Ładny splash screen Arch + motyw GRUB
+# 32. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -834,12 +843,7 @@ Po instalacji najlepiej zrestartować system.
 - `plymouth` jako splash screen przy starcie
 - motyw `plymouth-theme-arch-breeze-git` z AUR
 
-Instalacja:
-
-```bash
-sudo pacman -S plymouth plymouth-kcm breeze-grub
-yay -S plymouth-theme-arch-breeze-git
-```
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to pakiety do splash screena i GRUB-a są już zainstalowane.
 
 Ustawienie motywu Plymouth:
 
@@ -897,7 +901,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 32. Stan końcowy systemu
+# 33. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
