@@ -127,36 +127,9 @@ ssh root@ADRES_IP
 
 ---
 
-# 3. Zabezpieczenie sesji SSH przed zerwaniem przez tmux
-
-Od razu po zalogowaniu po SSH zainstaluj i uruchom `tmux`:
-
-```bash
-pacman -Sy --noconfirm tmux
-tmux new -A -s arch
-```
-
-Od tej chwili wykonuj całą instalację **wewnątrz `tmux`**.
-
-Jeśli SSH się zerwie:
-
-```bash
-ssh root@ADRES_IP
-tmux attach -t arch
-```
-
-Przydatne skróty:
-
-```text
-Ctrl+b d   odłączenie sesji bez jej zabijania
-Ctrl+b c   nowe okno
-Ctrl+b n   następne okno
-Ctrl+b p   poprzednie okno
-```
-
 ---
 
-# 4. Sprawdzenie trybu bootu i dysków
+# 3. Sprawdzenie trybu bootu i dysków
 
 ```bash
 ls /sys/firmware/efi/efivars >/dev/null && echo UEFI_OK || echo NIE_UEFI
@@ -172,7 +145,7 @@ Ten przewodnik zakłada, że:
 
 ---
 
-# 5. Partycjonowanie dysku
+# 4. Partycjonowanie dysku
 
 > **Uwaga:** ten krok kasuje cały `/dev/nvme0n1`.
 
@@ -195,7 +168,7 @@ lsblk -f /dev/nvme0n1
 
 ---
 
-# 6. Formatowanie i tworzenie subvolume Btrfs
+# 5. Formatowanie i tworzenie subvolume Btrfs
 
 ```bash
 mkfs.fat -F32 /dev/nvme0n1p1
@@ -231,7 +204,7 @@ umount /mnt
 
 ---
 
-# 7. Montowanie docelowego układu systemowego
+# 6. Montowanie docelowego układu systemowego
 
 Na tym etapie montujemy wszystko oprócz subvolume specyficznych dla użytkownika. Te zamontujemy dopiero po utworzeniu użytkownika.
 
@@ -264,7 +237,7 @@ swapon --show
 
 ---
 
-# 8. Instalacja pakietów
+# 7. Instalacja pakietów
 
 Instalujemy:
 
@@ -292,7 +265,7 @@ pacstrap -K /mnt \
 
 ---
 
-# 9. Podstawowa konfiguracja systemu i utworzenie użytkownika
+# 8. Podstawowa konfiguracja systemu i utworzenie użytkownika
 
 Wejdź do chroota:
 
@@ -335,7 +308,7 @@ exit
 
 ---
 
-# 10. Montowanie subvolume specyficznych dla użytkownika
+# 9. Montowanie subvolume specyficznych dla użytkownika
 
 Teraz, gdy użytkownik już istnieje i ma poprawne `/home`, można zamontować subvolume wyłączone ze snapshotów `/home`.
 
@@ -368,7 +341,7 @@ arch-chroot /mnt chmod 700 /home/pietryszak/.ssh
 
 ---
 
-# 11. Generowanie fstab
+# 10. Generowanie fstab
 
 Dopiero teraz, gdy wszystkie docelowe mountpointy są już zamontowane, generujemy finalny `fstab`.
 
@@ -400,7 +373,7 @@ Powinny pojawić się wpisy dla:
 
 ---
 
-# 12. Konfiguracja hibernacji
+# 11. Konfiguracja hibernacji
 
 Ustawienie `resume=UUID=...` dla GRUB i hooka `resume` w `mkinitcpio`:
 
@@ -420,7 +393,7 @@ EOF
 
 ---
 
-# 13. Konfiguracja Snappera dla `/`
+# 12. Konfiguracja Snappera dla `/`
 
 ## 13.1 Utworzenie konfiguracji root bez D-Bus
 
@@ -450,7 +423,7 @@ mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshot
 
 ---
 
-# 14. Konfiguracja Snappera dla `/home`
+# 13. Konfiguracja Snappera dla `/home`
 
 ## 14.1 Utworzenie konfiguracji home bez D-Bus
 
@@ -478,7 +451,7 @@ mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home
 
 ---
 
-# 15. Włączenie timeline i cleanup dla Snappera
+# 14. Włączenie timeline i cleanup dla Snappera
 
 Ustawienia dla `root`:
 
@@ -531,7 +504,7 @@ arch-chroot /mnt snapper --no-dbus -c home list
 
 ---
 
-# 16. Instalacja GRUB i integracja snapshotów
+# 15. Instalacja GRUB i integracja snapshotów
 
 ```bash
 arch-chroot /mnt /bin/bash <<'EOF'
@@ -550,7 +523,7 @@ EOF
 
 ---
 
-# 17. Ostatnia kontrola przed restartem
+# 16. Ostatnia kontrola przed restartem
 
 ```bash
 arch-chroot /mnt cat /etc/locale.conf
@@ -578,7 +551,7 @@ Powinno wyjść mniej więcej:
 
 ---
 
-# 18. Restart
+# 17. Restart
 
 ```bash
 umount -R /mnt
@@ -590,7 +563,7 @@ Wyjmij pendrive instalacyjny.
 
 ---
 
-# 19. Kontrola po pierwszym starcie
+# 18. Kontrola po pierwszym starcie
 
 Po zalogowaniu do zainstalowanego systemu:
 
@@ -613,7 +586,7 @@ To potwierdza:
 
 ---
 
-# 20. Test hibernacji
+# 19. Test hibernacji
 
 Najprostszy test:
 
@@ -623,7 +596,7 @@ sudo systemctl hibernate
 
 ---
 
-# 21. Snapshot bazowy po udanej instalacji
+# 20. Snapshot bazowy po udanej instalacji
 
 Po pierwszym poprawnym starcie dobrze od razu zrobić snapshot bazowy:
 
@@ -637,7 +610,7 @@ sudo snapper -c home list
 
 ---
 
-# 22. Opcjonalnie: wymuszenie polskiego układu klawiatury dla GUI
+# 21. Opcjonalnie: wymuszenie polskiego układu klawiatury dla GUI
 
 Jeśli chcesz dodatkowo ustawić układ X11/GUI na polski:
 
@@ -649,7 +622,7 @@ sudo localectl --no-convert set-x11-keymap pl
 
 ---
 
-# 24. Po instalacji: narzędzia deweloperskie i `yay`
+# 23. Po instalacji: narzędzia deweloperskie i `yay`
 
 `git`, `wget` i `curl` są już instalowane w bazowym `pacstrap`, ale do budowania pakietów z AUR potrzebujesz jeszcze `base-devel`.
 
@@ -679,7 +652,7 @@ mkdir -p ~/.gc
 
 ---
 
-# 25. Po instalacji: drukarka i skaner Brother DCP-B7520DW
+# 24. Po instalacji: drukarka i skaner Brother DCP-B7520DW
 
 Dla KDE i urządzeń wielofunkcyjnych warto doinstalować:
 
@@ -711,7 +684,7 @@ Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`
 
 ---
 
-# 26. Konfiguracja skanera Brother po sieci
+# 25. Konfiguracja skanera Brother po sieci
 
 Najpierw ustal adres IP drukarki/skanera w sieci lokalnej.
 
@@ -726,7 +699,7 @@ Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
 ---
 
-# 27. Dodatkowe uwagi do Brothera
+# 26. Dodatkowe uwagi do Brothera
 
 Jeśli urządzenie nie zostanie wykryte automatycznie po sieci:
 
@@ -750,7 +723,7 @@ Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
 
 ---
 
-# 28. Po instalacji: przeglądarka i poczta
+# 27. Po instalacji: przeglądarka i poczta
 
 Jeśli chcesz od razu doinstalować podstawowe aplikacje użytkowe, zainstaluj:
 
@@ -770,7 +743,9 @@ Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
 
 ---
 
-# 29. Ładny splash screen Arch + motyw GRUB
+---
+
+# 28. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -845,7 +820,9 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 30. Stan końcowy systemu
+---
+
+# 29. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -868,9 +845,6 @@ Po wykonaniu wszystkich kroków system ma:
 - Firefox
 - Thunderbird
 - Brave
-- ładny motyw GRUB-a
-- splash screen Plymouth
-- motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
 
 Dodatkowo rollback `/home` nie będzie ruszał:
 
@@ -881,4 +855,7 @@ Dodatkowo rollback `/home` nie będzie ruszał:
 - kluczy SSH
 
 bo te katalogi mają własne subvolume poza snapshotami `@home`.
-
+---
+- ładny motyw GRUB-a
+- splash screen Plymouth
+- motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
