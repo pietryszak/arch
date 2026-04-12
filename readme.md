@@ -750,40 +750,7 @@ Przy zwykłym użyciu przez Wi‑Fi lub LAN najczęściej wystarcza:
 
 ---
 
-# 28. Stan końcowy systemu
-
-Po wykonaniu wszystkich kroków system ma:
-
-- Arch Linux
-- Btrfs
-- snapshoty przez Snapper dla `/` i `/home`
-- automatyczne snapshoty pacmana przez `snap-pac`
-- GRUB z menu snapshotów dzięki `grub-btrfs`
-- działającą hibernację
-- minimalne KDE Plasma
-- Plasma Login Manager
-- hostname `arch`
-- `en_US.UTF-8`
-- polską klawiaturę
-- strefę `Europe/Warsaw`
-- `neovim`
-- `wget`, `git`, `curl`, `btop`, `fastfetch`
-- `yay`
-- obsługę drukarki i skanera Brother DCP-B7520DW
-
-Dodatkowo rollback `/home` nie będzie ruszał:
-
-- Firefoksa
-- Brave
-- Thunderbirda
-- kluczy GPG
-- kluczy SSH
-
-bo te katalogi mają własne subvolume poza snapshotami `@home`.
-
----
-
-# 29. Po instalacji: przeglądarka i poczta
+# 28. Po instalacji: przeglądarka i poczta
 
 Jeśli chcesz od razu doinstalować podstawowe aplikacje użytkowe, zainstaluj:
 
@@ -803,7 +770,7 @@ Nie instalujemy tutaj `kwallet` ani `kwallet-pam`.
 
 ---
 
-# 30. Zaktualizowany stan końcowy systemu
+# 29. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
