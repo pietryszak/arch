@@ -247,28 +247,26 @@ swapon --show
 
 # 10. Instalacja pakietów
 
-Instalujemy:
+Instalujemy wszystko, co jest dostępne w oficjalnych repozytoriach — bazę systemu, GRUB, sieć, dźwięk, pełne KDE Plasma, Snapper, narzędzia, przeglądarki, Bluetooth, drukowanie, Plymouth i narzędzia deweloperskie.
 
-* bazę systemu
-* GRUB
-* sieć
-* PipeWire
-* pełne KDE Plasma przez `plasma-meta`
-* Snapper
-* grub-btrfs
-* dodatkowe narzędzia
+Pakiety z AUR (Brave, sterowniki Brother, xpadneo, motyw Plymouth) instalujemy dopiero po restarcie, bo `makepkg` nie działa jako root.
 
 ```
 pacstrap -K /mnt \
-  base linux linux-firmware intel-ucode btrfs-progs \
+  base base-devel linux linux-firmware intel-ucode btrfs-progs \
   grub efibootmgr \
   networkmanager openssh sudo neovim bash-completion wget git curl btop fastfetch man-db man-pages \
   pipewire-audio pipewire-alsa pipewire-pulse wireplumber sof-firmware \
   plasma-meta \
   dolphin konsole \
   xdg-user-dirs xdg-desktop-portal power-profiles-daemon \
-  speech-dispatcher \
-  snapper grub-btrfs inotify-tools bash-completion
+  snapper grub-btrfs inotify-tools \
+  cups system-config-printer avahi nss-mdns sane simple-scan \
+  firefox thunderbird \
+  bluez bluez-utils bluez-obex \
+  linux-headers dkms \
+  plymouth plymouth-kcm breeze-grub \
+  playerctl
 ```
 
 > **Uwaga:** `plasma-meta` dociąga pełny zestaw komponentów Plasma, więc instalacja będzie wyraźnie większa niż przy ręcznie skrojonym, minimalnym zestawie.  
@@ -381,9 +379,9 @@ Powinny pojawić się wpisy dla:
 
 ---
 
-# 14. Konfiguracja hibernacji
+# 14. Konfiguracja hibernacji i Plymouth
 
-Ustawienie `resume=UUID=...` dla GRUB i hooka `resume` w `mkinitcpio`:
+Ustawienie `resume=UUID=...` i `splash` dla GRUB oraz hooków `plymouth` i `resume` w `mkinitcpio`:
 
 ```
 arch-chroot /mnt /bin/bash <<'EOF'
@@ -391,9 +389,22 @@ set -e
 
 SWAP_UUID=$(blkid -s UUID -o value /dev/nvme0n1p2)
 
-sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet resume=UUID=${SWAP_UUID}\"/" /etc/default/grub
+sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet splash resume=UUID=${SWAP_UUID}\"/" /etc/default/grub
 
-grep -q '\<resume\>' /etc/mkinitcpio.conf || sed -i 's/\<fsck\>/resume fsck/' /etc/mkinitcpio.conf
+# Dodaj motyw GRUB Breeze
+grep -q '^GRUB_THEME=' /etc/default/grub \
+  && sed -i 's|^GRUB_THEME=.*|GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"|' /etc/default/grub \
+  || printf 'GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"\n' >> /etc/default/grub
+
+# Dodaj hooki plymouth i resume do mkinitcpio
+# Wynikowa kolejność: ... block plymouth filesystems resume fsck
+sed -i \
+  -e 's/\<filesystems\>/plymouth filesystems/' \
+  -e 's/\<fsck\>/resume fsck/' \
+  /etc/mkinitcpio.conf
+
+# Upewnij się, że plymouth i resume nie są zduplikowane
+sed -i 's/\(plymouth \)\+/plymouth /g; s/\(resume \)\+/resume /g' /etc/mkinitcpio.conf
 
 mkinitcpio -P
 EOF
@@ -516,7 +527,7 @@ arch-chroot /mnt snapper --no-dbus -c home list
 
 ---
 
-# 18. Instalacja GRUB i integracja snapshotów
+# 18. Instalacja GRUB i włączenie usług systemowych
 
 ```
 arch-chroot /mnt /bin/bash <<'EOF'
@@ -530,6 +541,9 @@ systemctl enable NetworkManager
 systemctl enable sshd
 systemctl enable power-profiles-daemon
 systemctl enable plasmalogin.service
+systemctl enable cups.service
+systemctl enable avahi-daemon.service
+systemctl enable bluetooth.service
 EOF
 ```
 
@@ -542,9 +556,13 @@ arch-chroot /mnt cat /etc/locale.conf
 arch-chroot /mnt cat /etc/vconsole.conf
 arch-chroot /mnt cat /etc/hostname
 arch-chroot /mnt grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
+arch-chroot /mnt grep '^GRUB_THEME' /etc/default/grub
 arch-chroot /mnt grep HOOKS /etc/mkinitcpio.conf
 arch-chroot /mnt systemctl is-enabled plasmalogin.service
 arch-chroot /mnt systemctl is-enabled grub-btrfsd.service
+arch-chroot /mnt systemctl is-enabled cups.service
+arch-chroot /mnt systemctl is-enabled avahi-daemon.service
+arch-chroot /mnt systemctl is-enabled bluetooth.service
 arch-chroot /mnt snapper --no-dbus -c root list
 arch-chroot /mnt snapper --no-dbus -c home list
 ```
@@ -554,10 +572,14 @@ Powinno wyjść mniej więcej:
 * `LANG=en_US.UTF-8`
 * `KEYMAP=pl`
 * hostname `arch`
-* `resume=UUID=...`
-* `resume` w HOOKS
+* `resume=UUID=...` i `splash`
+* `GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"`
+* `plymouth` i `resume` w HOOKS
 * `plasmalogin.service` = `enabled`
 * `grub-btrfsd.service` = `enabled`
+* `cups.service` = `enabled`
+* `avahi-daemon.service` = `enabled`
+* `bluetooth.service` = `enabled`
 * snapshot `fresh-install-root`
 * snapshot `fresh-install-home`
 
@@ -632,29 +654,24 @@ sudo localectl --no-convert set-x11-keymap pl
 
 ---
 
-# 25. Po instalacji: narzędzia deweloperskie i `yay`
+# 25. Po instalacji: `yay` i pakiety z AUR
 
-`git`, `wget` i `curl` są już instalowane w bazowym `pacstrap`, ale do budowania pakietów z AUR potrzebujesz jeszcze `base-devel`.
-
-Do jednorazowej instalacji `yay` najprościej użyć `/tmp`:
+Do budowania pakietów z AUR potrzebujesz `yay`. Do jednorazowej instalacji najprościej użyć `/tmp`:
 
 ```
-sudo pacman -S --needed base-devel git wget curl
 cd /tmp
 git clone https://aur.archlinux.org/yay.git
 cd yay
 makepkg -si
 ```
 
-To wystarczy do poprawnej instalacji `yay`.
+Potem zainstaluj pakiety z AUR jednym poleceniem:
 
-Opcjonalnie możesz później utworzyć własny katalog, na przykład `~/.gc`, jeśli chcesz trzymać tam:
+```
+yay -S brave-bin brother-dcp-b7520dw brscan4 brscan-skey xpadneo-dkms plymouth-theme-arch-breeze-git
+```
 
-* klony z GitHuba
-* PKGBUILD-y z AUR
-* własne skrypty i repozytoria
-
-Przykład:
+Opcjonalnie możesz później utworzyć własny katalog, na przykład `~/.gc`, jeśli chcesz trzymać tam klony z GitHuba, PKGBUILD-y z AUR czy własne skrypty:
 
 ```
 mkdir -p ~/.gc
@@ -662,45 +679,9 @@ mkdir -p ~/.gc
 
 ---
 
-# 26. Po instalacji: szybka zbiorcza instalacja pakietów
+# 26. Po instalacji: konfiguracja urządzeń i aplikacji
 
-Jeśli wolisz zainstalować większość dodatkowych pakietów jednym strzałem po pierwszym starcie systemu, użyj tego wariantu.
-
-## Pakiety z oficjalnych repozytoriów
-
-```
-sudo pacman -S --needed \
-  cups system-config-printer avahi nss-mdns sane simple-scan \
-  firefox thunderbird \
-  bluez bluez-utils bluez-obex \
-  linux-headers dkms \
-  plymouth plymouth-kcm breeze-grub \
-  vlc ffmpeg x264 x265 \
-  gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav \
-  libdvdcss libdvdread libdvdnav libbluray \
-  a52dec faac faad2 flac jasper lame libdca libmad libmpeg2 libtheora libvorbis libxv wavpack xvidcore aom dav1d libvpx opus \
-  mjpegtools speex twolame zvbi libdvbpsi projectm chromaprint libnfs libmicrodns srt
-```
-
-## Usługi systemowe
-
-```
-sudo systemctl enable --now cups.service avahi-daemon.service bluetooth.service
-```
-
-## Pakiety z AUR
-
-```
-yay -S brother-dcp-b7520dw brscan4 brscan-skey brave-bin xpadneo-dkms plymouth-theme-arch-breeze-git spotify
-```
-
-`--needed` jest ważne, bo nie próbuje reinstalować pakietów, które już masz.
-
-> **Uwaga:** `spotify` z AUR instaluje pełnego klienta Spotify. Nie używaj `spotify-launcher` — ten pakiet jest tylko launcherem który dopiero pobiera Spotify i ma problemy z widocznością w menu KDE.
-
----
-
-# 27. Po instalacji: drukarka i skaner Brother DCP-B7520DW
+## Drukarka i skaner Brother DCP-B7520DW
 
 Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
 
@@ -713,11 +694,7 @@ scanimage -L
 
 Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
----
-
-# 28. Po instalacji: przeglądarka i poczta
-
-## Brave na KDE: trwałe obejście wolnego startu
+## Brave: trwałe obejście wolnego startu na KDE
 
 Jeśli Brave uruchamia się bardzo długo na KDE Plasma, ustaw go na stałe z flagą `--password-store=basic`.
 
@@ -737,11 +714,7 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
----
-
-# 29. Po instalacji: Bluetooth w KDE
-
-## AirPods Pro / sterowanie mediami
+## Bluetooth: AirPods Pro i sterowanie mediami
 
 Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
 
@@ -751,65 +724,26 @@ Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawa
 systemctl --user enable --now mpris-proxy.service
 ```
 
-Jeśli po tym sterowanie dalej nie działa, doinstaluj `playerctl` i sprawdź MPRIS ręcznie:
+Jeśli po tym sterowanie dalej nie działa, sprawdź MPRIS ręcznie:
 
 ```
-sudo pacman -S playerctl
 playerctl -l
 playerctl play-pause
 ```
 
-## Xbox pad po Bluetooth
+## Bluetooth: Xbox pad
 
 Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
 
----
+## Motyw Plymouth
 
-# 30. Ładny splash screen Arch + motyw GRUB
-
-Ustawienie motywu Plymouth:
+Ustawienie motywu Plymouth na Arch + Breeze:
 
 ```
 sudo plymouth-set-default-theme -R arch-breeze
 ```
 
-Konfiguracja GRUB-a:
-
-```
-sudo nvim /etc/default/grub
-```
-
-Upewnij się, że linia wygląda mniej więcej tak:
-
-```
-GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet splash resume=UUID=TWOJ_SWAP_UUID"
-GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"
-```
-
-Jeśli masz już ustawione `resume=UUID=...`, po prostu dopisz `splash` i dodaj linię `GRUB_THEME=...`.
-
-Konfiguracja `mkinitcpio`:
-
-```
-sudo nvim /etc/mkinitcpio.conf
-```
-
-Dodaj hook `plymouth` przed `filesystems`.
-
-Przykład:
-
-```
-HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block plymouth filesystems resume fsck)
-```
-
-Potem przebuduj initramfs i GRUB:
-
-```
-sudo mkinitcpio -P
-sudo grub-mkconfig -o /boot/grub/grub.cfg
-```
-
-Gdybyś kiedyś chciał wrócić do zwykłego Breeze, użyj:
+Gdybyś kiedyś chciał wrócić do zwykłego Breeze:
 
 ```
 sudo pacman -S breeze-plymouth
@@ -818,7 +752,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 31. Stan końcowy systemu
+# 27. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -842,16 +776,13 @@ Po wykonaniu wszystkich kroków system ma:
 * Firefox
 * Thunderbird
 * Brave
-* Spotify
-* VLC z pełnym zestawem kodeków audio/wideo
 * Bluetooth w KDE
 * wsparcie dla AirPods Pro
 * `mpris-proxy.service` dla sterowania mediami po Bluetooth
 * `xpadneo-dkms` dla pada Xbox po Bluetooth
-* ładny motyw GRUB-a
-* splash screen Plymouth
-* motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
-* `speech-dispatcher`
+* ładny motyw GRUB-a (Breeze)
+* splash screen Plymouth (Arch + Breeze)
+* motyw startowy pasujący do ciemnego KDE Plasma
 
 Dodatkowo rollback `/home` nie będzie ruszał:
 
