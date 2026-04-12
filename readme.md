@@ -1,5 +1,31 @@
 # Arch Linux na Dell Latitude 5421
 
+## Btrfs + Snapper + hibernacja + GRUB snapshoty + pełne Plasma + Plasma Login Manager
+
+Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421** z:
+
+- UEFI
+- Btrfs
+- snapshotami przez Snapper
+- osobnymi snapshotami dla `/` i `/home`
+- działającą hibernacją
+- GRUB + grub-btrfs do wybierania snapshotów z menu startowego
+- pełnym KDE Plasma przez `plasma-meta`
+- Plasma Login Manager zamiast SDDM
+- językiem systemu ustawionym na `en_US.UTF-8`
+- polską klawiaturą
+- strefą czasową `Europe/Warsaw`
+
+Docelowa konfiguracja:
+
+- dysk docelowy: `/dev/nvme0n1`
+- pełne wyczyszczenie dysku
+- brak szyfrowania
+- użytkownik: `pietryszak`
+- hostname: `arch`
+
+Ten układ zostawia **`/boot` na Btrfs**, a partycję EFI montuje jako **`/boot/efi`**. Dzięki temu kernel i initramfs pozostają na Btrfs i lepiej pasują do rollbacku snapshotów.
+
 ---
 
 # 1. Układ partycji
@@ -635,11 +661,11 @@ mkdir -p ~/.gc
 
 ---
 
+---
+
 # 26. Po instalacji: szybka zbiorcza instalacja pakietów
 
-Jeśli wolisz zainstalować większość dodatkowych pakietów jednym strzałem po pierwszym starcie systemu, możesz użyć takiego wariantu.
-
-To jest sekcja zbiorcza. Jeśli użyjesz jej w całości, w dalszych sekcjach nie musisz już powtarzać instalacji tych samych pakietów — zostają tam tylko konfiguracje i wyjaśnienia.
+Jeśli wolisz zainstalować większość dodatkowych pakietów jednym strzałem po pierwszym starcie systemu, użyj tego wariantu.
 
 ## Pakiety z oficjalnych repozytoriów
 
@@ -664,14 +690,10 @@ sudo systemctl enable --now cups.service avahi-daemon.service bluetooth.service
 yay -S brother-dcp-b7520dw brscan4 brscan-skey brave-bin xpadneo-dkms plymouth-theme-arch-breeze-git
 ```
 
-Dobra praktyka jest taka:
-- w README trzymać pakiety w osobnych sekcjach tematycznych, bo łatwiej zrozumieć po co są
-- w praktyce instalować pakiety z oficjalnych repo jedną komendą `pacman -S --needed`
-- pakiety z AUR robić osobno przez `yay`
-
 `--needed` jest ważne, bo nie próbuje reinstalować pakietów, które już masz.
 
 ---
+
 # 27. Po instalacji: drukarka i skaner Brother DCP-B7520DW
 
 Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
@@ -685,22 +707,9 @@ scanimage -L
 
 Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
-# 28. Konfiguracja skanera Brother po sieci
-
-Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
-
-Potem dodaj urządzenie do konfiguracji `brscan4`:
-
-```bash
-sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
-scanimage -L
-```
-
-Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
-
 ---
 
-# 29. Po instalacji: przeglądarka i poczta
+# 28. Po instalacji: przeglądarka i poczta
 
 ## Brave na KDE: trwałe obejście wolnego startu
 
@@ -722,39 +731,35 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
-# 30. Po instalacji: Bluetooth w KDE
+---
 
-Przy `plasma-meta` masz już między innymi:
+# 29. Po instalacji: Bluetooth w KDE
 
-- `kinfocenter`
-- `bluedevil`
-
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to masz już też:
-
-- `bluez`
-- `bluez-utils`
-- `bluez-obex`
-- włączony `bluetooth.service`
-
-## AirPods Pro
+## AirPods Pro / sterowanie mediami
 
 Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
 
-## Xbox pad po Bluetooth
+Żeby działało sterowanie mediami z przycisków słuchawek Bluetooth, uruchom usługę użytkownika:
 
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` masz już zainstalowane.
+```bash
+systemctl --user enable --now mpris-proxy.service
+```
+
+Jeśli po tym sterowanie dalej nie działa, doinstaluj `playerctl` i sprawdź MPRIS ręcznie:
+
+```bash
+sudo pacman -S playerctl
+playerctl -l
+playerctl play-pause
+```
+
+## Xbox pad po Bluetooth
 
 Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
 
-# 31. Ładny splash screen Arch + motyw GRUB
+---
 
-Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
-
-- `breeze-grub` dla estetycznego GRUB-a
-- `plymouth` jako splash screen przy starcie
-- motyw `plymouth-theme-arch-breeze-git` z AUR
-
-Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to pakiety do splash screena i GRUB-a są już zainstalowane.
+# 30. Ładny splash screen Arch + motyw GRUB
 
 Ustawienie motywu Plymouth:
 
@@ -798,11 +803,6 @@ sudo mkinitcpio -P
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
-Po restarcie system powinien pokazywać:
-
-- estetyczny motyw GRUB-a
-- splash screen Plymouth w stylu Arch + Breeze
-
 Gdybyś kiedyś chciał wrócić do zwykłego Breeze, użyj:
 
 ```bash
@@ -812,7 +812,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 32. Stan końcowy systemu
+# 31. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -829,21 +829,17 @@ Po wykonaniu wszystkich kroków system ma:
 - polską klawiaturę
 - strefę `Europe/Warsaw`
 - `neovim`
+- `bash-completion`
 - `wget`, `git`, `curl`, `btop`, `fastfetch`
 - `yay`
 - obsługę drukarki i skanera Brother DCP-B7520DW
 - Firefox
 - Thunderbird
 - Brave
-- kinfocenter
 - Bluetooth w KDE
-- print-manager
-- plasma-browser-integration
-- spectacle
-- plasma-pa
-- plasma-systemmonitor
 - wsparcie dla AirPods Pro
-- xpadneo dla pada Xbox po Bluetooth
+- `mpris-proxy.service` dla sterowania mediami po Bluetooth
+- `xpadneo-dkms` dla pada Xbox po Bluetooth
 - ładny motyw GRUB-a
 - splash screen Plymouth
 - motyw startowy Arch + Breeze pasujący do ciemnego KDE Plasma
