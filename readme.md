@@ -1,31 +1,5 @@
 # Arch Linux na Dell Latitude 5421
 
-## Btrfs + Snapper + hibernacja + GRUB snapshoty + minimalne KDE + Plasma Login Manager
-
-Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421** z:
-
-- UEFI
-- Btrfs
-- snapshotami przez Snapper
-- osobnymi snapshotami dla `/` i `/home`
-- działającą hibernacją
-- GRUB + grub-btrfs do wybierania snapshotów z menu startowego
-- pełnym KDE Plasma przez `plasma-meta`
-- Plasma Login Manager zamiast SDDM
-- językiem systemu ustawionym na `en_US.UTF-8`
-- polską klawiaturą
-- strefą czasową `Europe/Warsaw`
-
-Docelowa konfiguracja:
-
-- dysk docelowy: `/dev/nvme0n1`
-- pełne wyczyszczenie dysku
-- brak szyfrowania
-- użytkownik: `pietryszak`
-- hostname: `arch`
-
-Ten układ zostawia **`/boot` na Btrfs**, a partycję EFI montuje jako **`/boot/efi`**. Dzięki temu kernel i initramfs pozostają na Btrfs i lepiej pasują do rollbacku snapshotów.
-
 ---
 
 # 1. Układ partycji
@@ -711,7 +685,22 @@ scanimage -L
 
 Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
 
-# 28. Po instalacji: przeglądarka i poczta
+# 28. Konfiguracja skanera Brother po sieci
+
+Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
+
+Potem dodaj urządzenie do konfiguracji `brscan4`:
+
+```bash
+sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
+scanimage -L
+```
+
+Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
+
+---
+
+# 29. Po instalacji: przeglądarka i poczta
 
 ## Brave na KDE: trwałe obejście wolnego startu
 
@@ -733,31 +722,31 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
-# 29. Po instalacji: Bluetooth w KDE
+# 30. Po instalacji: Bluetooth w KDE
+
+Przy `plasma-meta` masz już między innymi:
+
+- `kinfocenter`
+- `bluedevil`
+
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to masz już też:
+
+- `bluez`
+- `bluez-utils`
+- `bluez-obex`
+- włączony `bluetooth.service`
 
 ## AirPods Pro
 
 Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
 
-Żeby działało sterowanie mediami z przycisków słuchawek, uruchom usługę użytkownika:
-
-```bash
-systemctl --user enable --now mpris-proxy.service
-```
-
-Do testów MPRIS przydaje się też:
-
-```bash
-sudo pacman -S playerctl
-playerctl -l
-playerctl play-pause
-```
-
 ## Xbox pad po Bluetooth
+
+Jeśli korzystasz z sekcji **26. Po instalacji: szybka zbiorcza instalacja pakietów**, to `linux-headers`, `dkms` i `xpadneo-dkms` masz już zainstalowane.
 
 Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
 
-# 30. Ładny splash screen Arch + motyw GRUB
+# 31. Ładny splash screen Arch + motyw GRUB
 
 Żeby system od razu startował z ładnym ekranem pasującym do ciemnego KDE Plasma, doinstaluj:
 
@@ -823,7 +812,7 @@ sudo plymouth-set-default-theme -R breeze
 
 ---
 
-# 31. Stan końcowy systemu
+# 32. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -854,7 +843,6 @@ Po wykonaniu wszystkich kroków system ma:
 - plasma-pa
 - plasma-systemmonitor
 - wsparcie dla AirPods Pro
-- mpris-proxy dla sterowania mediami po Bluetooth
 - xpadneo dla pada Xbox po Bluetooth
 - ładny motyw GRUB-a
 - splash screen Plymouth
