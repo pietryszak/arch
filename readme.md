@@ -341,12 +341,7 @@ mount -o subvol=@ssh,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak
 Nadaj właściciela i poprawne uprawnienia:
 
 ```bash
-arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.mozilla
-arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.config/BraveSoftware
-arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.thunderbird
-arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.gnupg
-arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak/.ssh
-
+arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak
 arch-chroot /mnt chmod 700 /home/pietryszak/.gnupg
 arch-chroot /mnt chmod 700 /home/pietryszak/.ssh
 ```
@@ -584,12 +579,12 @@ Wyjmij pendrive instalacyjny.
 Po zalogowaniu do zainstalowanego systemu:
 
 ```bash
-sudo cat /proc/cmdline
-sudo swapon --show
-sudo snapper -c root list
-sudo snapper -c home list
-sudo systemctl status grub-btrfsd.service --no-pager
-sudo grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
+cat /proc/cmdline
+swapon --show
+snapper -c root list
+snapper -c home list
+systemctl status grub-btrfsd.service --no-pager
+grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
 ```
 
 To potwierdza:
@@ -700,7 +695,7 @@ Jeśli nie chcesz obsługi przycisku „Scan”, możesz pominąć `brscan-skey`
 
 # 27. Konfiguracja skanera Brother po sieci
 
-Najpierw ustal adres IP drukarki/skanera w sieci lokalnej.
+Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
 
 Potem dodaj urządzenie do konfiguracji `brscan4`:
 
