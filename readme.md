@@ -1,5 +1,31 @@
 # Arch Linux na Dell Latitude 5421
 
+## Btrfs + Snapper + hibernacja + GRUB snapshoty + pełne Plasma + Plasma Login Manager
+
+Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421** z:
+
+* UEFI
+* Btrfs
+* snapshotami przez Snapper
+* osobnymi snapshotami dla `/` i `/home`
+* działającą hibernacją
+* GRUB + grub-btrfs do wybierania snapshotów z menu startowego
+* pełnym KDE Plasma przez `plasma-meta`
+* Plasma Login Manager zamiast SDDM
+* językiem systemu ustawionym na `en_US.UTF-8`
+* polską klawiaturą
+* strefą czasową `Europe/Warsaw`
+
+Docelowa konfiguracja:
+
+* dysk docelowy: `/dev/nvme0n1`
+* pełne wyczyszczenie dysku
+* brak szyfrowania
+* użytkownik: `pietryszak`
+* hostname: `arch`
+
+Ten układ zostawia **`/boot` na Btrfs**, a partycję EFI montuje jako **`/boot/efi`**. Dzięki temu kernel i initramfs pozostają na Btrfs i lepiej pasują do rollbacku snapshotów.
+
 ---
 
 # 1. Układ partycji
@@ -221,9 +247,11 @@ swapon --show
 
 # 10. Instalacja pakietów
 
-Instalujemy wszystko, co jest dostępne w oficjalnych repozytoriach — bazę systemu, GRUB, sieć, dźwięk, pełne KDE Plasma, Snapper, narzędzia, przeglądarki, Bluetooth, drukowanie, Plymouth i narzędzia deweloperskie.
+Instalujemy wszystko, co jest dostępne w oficjalnych repozytoriach — bazę systemu, GRUB, sieć, dźwięk, pełne KDE Plasma, Snapper, narzędzia, przeglądarki, Bluetooth, drukowanie, Plymouth, kodeki, fonty, obsługę iPhone'a, firewall i narzędzia deweloperskie.
 
 Pakiety z AUR (Brave, sterowniki Brother, xpadneo, motyw Plymouth) instalujemy dopiero po restarcie, bo `makepkg` nie działa jako root.
+
+> **Uwaga:** `ntfs-3g` nie jest potrzebne — kernelowy sterownik `ntfs3` (wbudowany od 5.15) obsługuje pełny odczyt/zapis partycji NTFS.
 
 ```
 pacstrap -K /mnt \
@@ -240,7 +268,17 @@ pacstrap -K /mnt \
   bluez bluez-utils bluez-obex \
   linux-headers dkms \
   plymouth plymouth-kcm breeze-grub \
-  playerctl
+  playerctl msr-tools \
+  ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav libdvdcss \
+  zip unzip unrar p7zip \
+  exfatprogs dosfstools mtools \
+  gvfs gvfs-afc gvfs-gphoto2 \
+  libimobiledevice usbmuxd ifuse \
+  networkmanager-openvpn wireguard-tools \
+  fwupd \
+  noto-fonts noto-fonts-emoji ttf-liberation ttf-dejavu \
+  xdg-utils usbutils lsof net-tools smartmontools traceroute \
+  firewalld
 ```
 
 > **Uwaga:** `plasma-meta` dociąga pełny zestaw komponentów Plasma, więc instalacja będzie wyraźnie większa niż przy ręcznie skrojonym, minimalnym zestawie.  
@@ -518,6 +556,9 @@ systemctl enable plasmalogin.service
 systemctl enable cups.service
 systemctl enable avahi-daemon.service
 systemctl enable bluetooth.service
+systemctl enable fstrim.timer
+systemctl enable fwupd-refresh.timer
+systemctl enable firewalld.service
 EOF
 ```
 
@@ -537,6 +578,9 @@ arch-chroot /mnt systemctl is-enabled grub-btrfsd.service
 arch-chroot /mnt systemctl is-enabled cups.service
 arch-chroot /mnt systemctl is-enabled avahi-daemon.service
 arch-chroot /mnt systemctl is-enabled bluetooth.service
+arch-chroot /mnt systemctl is-enabled fstrim.timer
+arch-chroot /mnt systemctl is-enabled fwupd-refresh.timer
+arch-chroot /mnt systemctl is-enabled firewalld.service
 arch-chroot /mnt snapper --no-dbus -c root list
 arch-chroot /mnt snapper --no-dbus -c home list
 ```
@@ -554,6 +598,9 @@ Powinno wyjść mniej więcej:
 * `cups.service` = `enabled`
 * `avahi-daemon.service` = `enabled`
 * `bluetooth.service` = `enabled`
+* `fstrim.timer` = `enabled`
+* `fwupd-refresh.timer` = `enabled`
+* `firewalld.service` = `enabled`
 * snapshot `fresh-install-root`
 * snapshot `fresh-install-home`
 
@@ -628,7 +675,48 @@ sudo localectl --no-convert set-x11-keymap pl
 
 ---
 
-# 25. Po instalacji: `yay` i pakiety z AUR
+# 25. Po instalacji: fix DPTF throttling z zewnętrznymi monitorami
+
+Dell Latitude 5421 ma problem z DPTF (Dynamic Platform and Thermal Framework) — po podłączeniu zewnętrznych monitorów przez USB-C/Thunderbolt, BIOS nadmiernie dławi CPU do 200 MHz, mimo że temperatura jest normalna. Problem nasila się po hibernacji.
+
+DPTF to system Intela wbudowany w BIOS Della, który monitoruje łączny pobór mocy (CPU + GPU + porty USB-C + monitory). Kiedy uzna, że pobór jest za wysoki, ścina procesor do minimum. Na Linuksie nie ma dedykowanych sterowników Dell Thermal Framework, więc DPTF działa z agresywnymi domyślnymi progami z BIOS-u.
+
+Rozwiązanie: odpinamy sterownik `proc_thermal` automatycznie po każdym wybudzeniu z hibernacji/suspend.
+
+```
+sudo tee /etc/systemd/system/fix-dptf-throttle.service << 'EOF'
+[Unit]
+Description=Unbind DPTF proc_thermal after resume
+After=hibernate.target suspend.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'sleep 2 && echo 0000:00:04.0 > /sys/bus/pci/drivers/proc_thermal/unbind 2>/dev/null || true'
+
+[Install]
+WantedBy=hibernate.target suspend.target hybrid-sleep.target suspend-then-hibernate.target
+EOF
+
+sudo systemctl enable fix-dptf-throttle.service
+```
+
+> **Uwaga:** po odpiniu DPTF kernel i tak ma własny thermal throttling (`x86_pkg_temp`), który chroni procesor przed przegrzaniem. Warto jednak obserwować temperatury przez kilka dni (`btop` wystarczy).
+
+Diagnostyka — jeśli procesor znowu spadnie do 200 MHz:
+
+```
+cat /proc/cpuinfo | grep "MHz" | head -4
+```
+
+Szybki ręczny fix:
+
+```
+sudo sh -c 'echo 0000:00:04.0 > /sys/bus/pci/drivers/proc_thermal/unbind'
+```
+
+---
+
+# 26. Po instalacji: `yay` i pakiety z AUR
 
 Do budowania pakietów z AUR potrzebujesz `yay`. Do jednorazowej instalacji najprościej użyć `/tmp`:
 
@@ -653,7 +741,7 @@ mkdir -p ~/.gc
 
 ---
 
-# 26. Po instalacji: konfiguracja urządzeń i aplikacji
+# 27. Po instalacji: konfiguracja urządzeń i aplikacji
 
 ## Drukarka i skaner Brother DCP-B7520DW
 
@@ -688,9 +776,52 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
 
-## Bluetooth: AirPods Pro i sterowanie mediami
+## iPhone: parowanie i dostęp do plików
 
-Dla AirPods Pro obecny stos z tego README jest wystarczający. Nie trzeba dodawać osobnego sterownika.
+Podłącz iPhone'a kablem USB, odblokuj ekran i sparuj urządzenie:
+
+```
+idevicepair pair
+```
+
+Na iPhonie powinno wyskoczyć „Ufać temu komputerowi?" — kliknij „Ufaj" i wpisz kod. Potem potwierdź parowanie:
+
+```
+idevicepair pair
+idevicepair validate
+```
+
+Oba powinny zwrócić `SUCCESS`. Po sparowaniu iPhone pojawi się w panelu bocznym Dolphina.
+
+> **Uwaga:** jeśli Dolphin pokazuje błąd `Unhandled lockdownd code '-5'` (błąd SSL), wyczyść stare rekordy parowania i sparuj ponownie:
+>
+> ```
+> sudo rm -rf /var/lib/lockdown/*
+> sudo systemctl restart usbmuxd
+> ```
+>
+> Odłącz i podłącz iPhone'a, odblokuj ekran, potem `idevicepair pair`.
+> Jeśli to nie pomoże, zainstaluj wersję deweloperską z AUR:
+>
+> ```
+> yay -S libimobiledevice-git
+> sudo systemctl restart usbmuxd
+> ```
+
+Alternatywnie możesz zamontować iPhone'a z terminala:
+
+```
+mkdir -p ~/iPhone
+ifuse ~/iPhone
+```
+
+Zdjęcia będą w `~/iPhone/DCIM`. Żeby odmontować:
+
+```
+fusermount -u ~/iPhone
+```
+
+## Bluetooth: AirPods Pro i sterowanie mediami
 
 Żeby działało sterowanie mediami z przycisków słuchawek Bluetooth, uruchom usługę użytkownika:
 
@@ -724,9 +855,26 @@ sudo pacman -S breeze-plymouth
 sudo plymouth-set-default-theme -R breeze
 ```
 
+## Aktualizacje firmware
+
+Sprawdź dostępne aktualizacje firmware dla laptopa:
+
+```
+fwupdmgr refresh
+fwupdmgr get-updates
+```
+
+Jeśli są dostępne, zainstaluj je:
+
+```
+fwupdmgr update
+```
+
+Dell Latitude 5421 jest dobrze wspierany przez LVFS — aktualizacje BIOS/UEFI, Thunderbolt i NVMe mogą być stosowane bezpośrednio z Linuksa.
+
 ---
 
-# 27. Stan końcowy systemu
+# 28. Stan końcowy systemu
 
 Po wykonaniu wszystkich kroków system ma:
 
@@ -746,6 +894,17 @@ Po wykonaniu wszystkich kroków system ma:
 * `bash-completion`
 * `wget`, `git`, `curl`, `btop`, `fastfetch`
 * `yay`
+* kodeki multimedialne (GStreamer, FFmpeg, libdvdcss)
+* obsługę archiwów (zip, unzip, unrar, p7zip)
+* obsługę systemów plików exFAT, FAT32 (NTFS przez kernelowy `ntfs3`)
+* obsługę iPhone'a (libimobiledevice, ifuse, gvfs-afc)
+* VPN (OpenVPN + WireGuard)
+* firewall (firewalld)
+* aktualizacje firmware (fwupd)
+* TRIM dla SSD (fstrim.timer)
+* fix DPTF throttling dla zewnętrznych monitorów
+* fonty (Noto, Noto Emoji, Liberation, DejaVu)
+* narzędzia systemowe (xdg-utils, usbutils, lsof, net-tools, smartmontools, traceroute)
 * obsługę drukarki i skanera Brother DCP-B7520DW
 * Firefox
 * Thunderbird
