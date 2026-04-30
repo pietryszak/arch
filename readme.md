@@ -1384,7 +1384,278 @@ kbuildsycoca6
 
 ---
 
-## 25.16 Snapshot po post-install
+
+---
+
+## 25.17 Bezpieczne SSH tylko w domu
+
+Ten wariant został ustawiony po instalacji. Cel:
+
+```text
+sshd działa
+root przez SSH zablokowany
+logowanie hasłem wyłączone
+logowanie tylko kluczem SSH
+firewall wpuszcza SSH tylko z domowej podsieci LAN
+publiczna strefa firewalld nie ma otwartego SSH
+```
+
+### Instalacja narzędzi i firewalla
+
+Jeśli nie były jeszcze zainstalowane:
+
+```bash
+sudo pacman -S --needed \
+  bash-completion btop fastfetch openssh playerctl \
+  zip unzip p7zip \
+  exfatprogs dosfstools \
+  usbutils lsof smartmontools traceroute \
+  wireguard-tools \
+  firewalld
+```
+
+Włączenie `sshd` i `firewalld`:
+
+```bash
+sudo systemctl enable --now sshd
+sudo systemctl enable --now firewalld
+```
+
+Sprawdzenie:
+
+```bash
+systemctl is-enabled sshd
+systemctl is-active sshd
+
+sudo firewall-cmd --state
+sudo firewall-cmd --get-default-zone
+sudo firewall-cmd --list-all
+```
+
+### Firewall: SSH tylko z domowej podsieci
+
+Najpierw sprawdź adres IP laptopa i podsieć:
+
+```bash
+ip -4 addr show wlp0s20f3
+ip route
+```
+
+Przykład:
+
+```text
+192.168.1.123/24
+```
+
+Wtedy domowa podsieć to:
+
+```text
+192.168.1.0/24
+```
+
+W poniższych komendach podmień `192.168.1.0/24`, jeśli Twoja sieć ma inny zakres.
+
+Usuń SSH ze strefy `public`:
+
+```bash
+sudo firewall-cmd --permanent --zone=public --remove-service=ssh
+```
+
+Utwórz osobną strefę dla domowego SSH:
+
+```bash
+sudo firewall-cmd --permanent --new-zone=home-ssh
+```
+
+Dodaj domową podsieć:
+
+```bash
+sudo firewall-cmd --permanent --zone=home-ssh --add-source=192.168.1.0/24
+```
+
+Pozwól na SSH tylko w tej strefie:
+
+```bash
+sudo firewall-cmd --permanent --zone=home-ssh --add-service=ssh
+```
+
+Przeładuj firewalla:
+
+```bash
+sudo firewall-cmd --reload
+```
+
+Sprawdź:
+
+```bash
+sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --zone=public --list-all
+sudo firewall-cmd --zone=home-ssh --list-all
+```
+
+Oczekiwany wynik logiczny:
+
+```text
+public:
+  interfaces: wlp0s20f3
+  services: dhcpv6-client
+  brak ssh
+
+home-ssh:
+  sources: 192.168.1.0/24
+  services: ssh
+```
+
+Przykład poprawnego stanu:
+
+```text
+home-ssh
+  sources: 192.168.1.0/24
+public (default)
+  interfaces: wlp0s20f3
+
+public (default, active)
+  services: dhcpv6-client
+
+home-ssh (active)
+  sources: 192.168.1.0/24
+  services: ssh
+```
+
+### Hardening SSH — etap bezpieczny, jeszcze z hasłem
+
+Najpierw ustaw konfigurację tak, żeby nie odciąć się przed dodaniem klucza:
+
+```bash
+sudo mkdir -p /etc/ssh/sshd_config.d
+
+sudo tee /etc/ssh/sshd_config.d/99-hardening.conf >/dev/null <<'EOF'
+PermitRootLogin no
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+PermitTunnel no
+
+MaxAuthTries 3
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+AllowUsers pietryszak
+EOF
+
+sudo sshd -t
+sudo systemctl restart sshd
+```
+
+Sprawdzenie realnej konfiguracji:
+
+```bash
+sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication|kbdinteractiveauthentication|pubkeyauthentication|x11forwarding|allowtcpforwarding|allowagentforwarding|permittunnel|allowusers'
+```
+
+Na tym etapie oczekiwane:
+
+```text
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication yes
+kbdinteractiveauthentication no
+x11forwarding no
+allowtcpforwarding no
+allowagentforwarding no
+allowusers pietryszak
+permittunnel no
+```
+
+### Dodanie klucza SSH
+
+Na komputerze, z którego będziesz się łączyć:
+
+```bash
+ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_ed25519_arch
+```
+
+Skopiuj klucz na laptopa z Archem:
+
+```bash
+ssh-copy-id -i ~/.ssh/id_ed25519_arch.pub pietryszak@IP_ARCHA
+```
+
+Test:
+
+```bash
+ssh -i ~/.ssh/id_ed25519_arch pietryszak@IP_ARCHA
+```
+
+Jeżeli klucz działa, można wyłączyć logowanie hasłem.
+
+Jeśli nie używasz `ssh-copy-id`, dodaj klucz lokalnie na Archu do:
+
+```text
+/home/pietryszak/.ssh/authorized_keys
+```
+
+i ustaw prawa:
+
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### Finalnie: SSH tylko kluczem, bez hasła
+
+Dopiero po potwierdzeniu, że logowanie kluczem działa:
+
+```bash
+sudo sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config.d/99-hardening.conf
+sudo sshd -t
+sudo systemctl restart sshd
+```
+
+Sprawdzenie:
+
+```bash
+sudo sshd -T | grep -Ei 'passwordauthentication|kbdinteractiveauthentication|pubkeyauthentication|permitrootlogin|allowusers'
+```
+
+Oczekiwane:
+
+```text
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+kbdinteractiveauthentication no
+allowusers pietryszak
+```
+
+Finalny stan bezpieczeństwa:
+
+```text
+SSH działa tylko dla użytkownika pietryszak
+root login przez SSH jest zablokowany
+hasła przez SSH są zablokowane
+działają tylko klucze SSH
+firewalld wpuszcza SSH tylko z 192.168.1.0/24
+publiczna strefa nie ma otwartego SSH
+```
+
+### Snapshot po zabezpieczeniu SSH
+
+Po potwierdzeniu, że logowanie kluczem działa:
+
+```bash
+sudo snapper -c root create --description "secure ssh key-only home LAN"
+sudo snapper -c home create --description "home after secure ssh key-only"
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+
+## 25.18 Snapshot po post-install
 
 Po większych zmianach po instalacji:
 
@@ -1449,6 +1720,9 @@ Po wykonaniu opcjonalnych kroków post-install możesz dodatkowo mieć:
 - Xbox pad przez `xpadneo`
 - aktualizacje firmware przez `fwupd`
 - firewall
+- bezpieczne SSH tylko z domowej sieci LAN, tylko kluczem
 - kodeki
 - narzędzia diagnostyczne
 - fix DPTF throttling na Dell Latitude 5421
+
+
