@@ -248,7 +248,7 @@ LC_MONETARY=pl_PL.UTF-8
 LC_MEASUREMENT=pl_PL.UTF-8
 LC_PAPER=pl_PL.UTF-8
 EOF
-
+```
 ---
 
 ## 8. Użytkownik i sudo
