@@ -490,6 +490,7 @@ snapper --no-dbus -c home list
 
 `snap-pac` instalujemy dopiero po utworzeniu konfiguracji Snappera dla `/` i `/home`.  
 Nie instalować `snap-pac` w `pacstrap`, bo jego hooki pacmana mogą uruchomić się zanim Snapper będzie gotowy.
+Uwaga: w `chroot` po instalacji `snap-pac` może pojawić się komunikat `fatal library error, lookup self`. Jeśli `pacman -Q snap-pac` potwierdza instalację, a `snapper --no-dbus -c root list` działa, można to zignorować. Po normalnym bootowaniu systemu hooki `snap-pac` działają poprawnie.
 
 ```bash
 pacman -S --needed snap-pac
