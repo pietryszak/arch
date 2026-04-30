@@ -325,14 +325,6 @@ Offset do hibernacji:
 btrfs inspect-internal map-swapfile -r /swap/swapfile
 ```
 
-W tej instalacji wyszło:
-
-```text
-1549568
-```
-
-Nie wpisywać na ślepo — na innej instalacji policzyć ponownie.
-
 ---
 
 ## 11. mkinitcpio pod LUKS + systemd initramfs
