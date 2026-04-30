@@ -306,12 +306,6 @@ chattr +C /swap/swapfile
 lsattr /swap/swapfile
 ```
 
-Oczekiwane:
-
-```text
----------------C------ /swap/swapfile
-```
-
 Tworzenie pliku 40 GiB:
 
 ```bash
