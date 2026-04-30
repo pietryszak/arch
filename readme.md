@@ -160,8 +160,6 @@ mount -o "$BTRFS_SWAP_OPTS",subvol=@swap /dev/mapper/cryptroot /mnt/swap
 mount -o "$BTRFS_OPTS",subvol=@libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
 ```
 
-Ważna poprawka z instalacji: po zamontowaniu `/mnt/home` trzeba dopiero utworzyć `/mnt/home/.snapshots`, bo wcześniejszy katalog może zostać przykryty mountem. To samo dotyczy `/mnt/var/cache/pacman/pkg` po zamontowaniu `/mnt/var/cache`.
-
 Sprawdzenie:
 
 ```bash
@@ -195,18 +193,6 @@ pacstrap -K /mnt \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin
 ```
-
-Uwagi:
-
-- `plasma-login-manager` daje usługę `plasmalogin.service`.
-- Nie instalować `sddm`.
-- `qt6-tools`, `avahi`, `v4l-utils`, `emoji selector` mogą potem pojawić się w menu jako „śmieci”, ale są zależnościami ważnych komponentów:
-  - `avahi` wymagane m.in. przez `pipewire-pulse`
-  - `qt6-tools` wymagane przez `kwin` i `plasma-workspace`
-  - `v4l-utils` wymagane przez `ffmpeg`
-  - emoji selector jest częścią `plasma-desktop`
-- Tych pakietów nie usuwać. Ewentualnie ukryć wpisy `.desktop`.
-
 ---
 
 ## 7. fstab i chroot
