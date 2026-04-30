@@ -170,9 +170,6 @@ findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
 
 ## 6. Minimalny pacstrap
 
-Finalna użyta idea: minimum KDE, ale używalne — z terminalem i menedżerem plików.  
-Bez `sddm`, bez `nano`, bez `vim`, bez `fwupd`, bez Flatpak.
-
 ```bash
 pacstrap -K /mnt \
   base linux linux-headers linux-firmware \
