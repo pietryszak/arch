@@ -1,6 +1,93 @@
 # Arch Linux na Dell Latitude 5421 — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
 
+Instrukcja powstała po faktycznej instalacji i zawiera poprawki błędów, które wyszły w trakcie.  
+Docelowy system:
+
+- Arch Linux
+- UEFI
+- LUKS2 na root
+- TPM2 + PIN do odblokowania LUKS
+- Btrfs z subvolumami
+- Snapper dla `/` i `/home`
+- `grub-btrfs` z bootowalnymi snapshotami w GRUB
+- hibernacja na Btrfs swapfile
+- minimalne KDE Plasma
+- Plasma Login Manager, czyli `plasmalogin`, bez SDDM
+- NetworkManager, Bluetooth, PipeWire/WirePlumber
+- bez `nano`, bez `vim`, używany `neovim`
+- bez `fwupd`, bez Flatpak, bez pełnego KDE Gear
+
+---
+
+## 0. Założenia
+
+Dysk:
+
+```bash
+/dev/nvme0n1
+```
+
+Partycje:
+
+```text
+/dev/nvme0n1p1    EFI        1G      FAT32
+/dev/nvme0n1p2    cryptroot  reszta  LUKS2
+```
+
+W środku LUKS:
+
+```text
+/dev/mapper/cryptroot  Btrfs
+```
+
+Hostname:
+
+```text
+arch
+```
+
+Użytkownik:
+
+```text
+pietryszak
+```
+
+Subvolumy Btrfs:
+
+```text
+@                  /
+@home              /home
+@snapshots         /.snapshots
+@home_snapshots    /home/.snapshots
+@log               /var/log
+@cache             /var/cache
+@pkg               /var/cache/pacman/pkg
+@tmp               /var/tmp
+@spool             /var/spool
+@opt               /opt
+@swap              /swap
+@libvirt           /var/lib/libvirt
+@mozilla           /home/pietryszak/.mozilla
+@brave             /home/pietryszak/.config/BraveSoftware
+@thunderbird       /home/pietryszak/.thunderbird
+@ssh               /home/pietryszak/.ssh
+@gnupg             /home/pietryszak/.gnupg
+```
+
+---
+
 ## 1. Start z Arch ISO
+
+```bash
+loadkeys pl
+timedatectl set-ntp true
+```
+
+Sprawdzenie UEFI:
+
+```bash
+ls /sys/firmware/efi/efivars
+```
 
 Połączenie Wi-Fi z live ISO:
 
@@ -24,23 +111,7 @@ Test:
 ping -c 3 archlinux.org
 ```
 
-```bash
-loadkeys pl
-timedatectl set-ntp true
-```
-
-Na live ISO ustaw hasło roota i uruchom SSH:
-```bash
-passwd
-systemctl start sshd
-ip -br a
-```
-
-Z drugiego komputera połącz się tak:
-```bash
-ssh root@ADRES_IP
-```
-Reszta komend przez ssh.
+---
 
 ## 2. Partycjonowanie
 
@@ -160,18 +231,15 @@ mount -o "$BTRFS_SWAP_OPTS",subvol=@swap /dev/mapper/cryptroot /mnt/swap
 mount -o "$BTRFS_OPTS",subvol=@libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
 ```
 
+Ważna poprawka z instalacji: po zamontowaniu `/mnt/home` trzeba dopiero utworzyć `/mnt/home/.snapshots`, bo wcześniejszy katalog może zostać przykryty mountem. To samo dotyczy `/mnt/var/cache/pacman/pkg` po zamontowaniu `/mnt/var/cache`.
+
 Sprawdzenie:
 
 ```bash
 findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
 ```
 
----
-
-## 6. Minimalny pacstrap
-
-# Wymagane przed pacstrap, bo instalacja kernela odpala mkinitcpio,
-# a hook sd-vconsole/keymap szuka /etc/vconsole.conf w instalowanym systemie.
+Przed `pacstrap` utwórz `/mnt/etc/vconsole.conf`, bo instalacja kernela odpala `mkinitcpio`, a hook `sd-vconsole` szuka tego pliku w instalowanym systemie:
 
 ```bash
 mkdir -p /mnt/etc
@@ -180,6 +248,13 @@ cat > /mnt/etc/vconsole.conf <<'EOF'
 KEYMAP=pl
 EOF
 ```
+
+---
+
+## 6. Minimalny pacstrap
+
+Finalna użyta idea: minimum KDE, ale używalne — z terminalem i menedżerem plików.  
+Bez `sddm`, bez `nano`, bez `vim`, bez `fwupd`, bez Flatpak.
 
 ```bash
 pacstrap -K /mnt \
@@ -201,6 +276,18 @@ pacstrap -K /mnt \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin
 ```
+
+Uwagi:
+
+- `plasma-login-manager` daje usługę `plasmalogin.service`.
+- Nie instalować `sddm`.
+- `qt6-tools`, `avahi`, `v4l-utils`, `emoji selector` mogą potem pojawić się w menu jako „śmieci”, ale są zależnościami ważnych komponentów:
+  - `avahi` wymagane m.in. przez `pipewire-pulse`
+  - `qt6-tools` wymagane przez `kwin` i `plasma-workspace`
+  - `v4l-utils` wymagane przez `ffmpeg`
+  - emoji selector jest częścią `plasma-desktop`
+- Tych pakietów nie usuwać. Ewentualnie ukryć wpisy `.desktop`.
+
 ---
 
 ## 7. fstab i chroot
@@ -245,7 +332,9 @@ LC_PAPER=pl_PL.UTF-8
 EOF
 ```
 
-Ważna poprawka z instalacji: jeśli `mkinitcpio` przy `pacstrap` krzyczy o braku `/etc/vconsole.conf`, to po utworzeniu powyższego pliku trzeba ponownie wykonać:
+Plik `/mnt/etc/vconsole.conf` został utworzony przed `pacstrap`, żeby `mkinitcpio` podczas instalacji kernela nie wywalał błędu o braku `/etc/vconsole.conf`.
+
+Po późniejszej zmianie `HOOKS` i tak wykonamy:
 
 ```bash
 mkinitcpio -P
@@ -572,11 +661,18 @@ snapper --no-dbus -c home create --description "fresh encrypted home snapshot"
 snapper --no-dbus -c home list
 ```
 
+---
+
 ## 17.1 Instalacja snap-pac po konfiguracji Snappera
+
+`snap-pac` instalujemy dopiero po utworzeniu konfiguracji Snappera dla `/` i `/home`.  
+Nie instalować `snap-pac` w `pacstrap`, bo jego hooki pacmana mogą uruchomić się zanim Snapper będzie gotowy.
 
 ```bash
 pacman -S --needed snap-pac
 ```
+
+
 ---
 
 ## 18. Timery Snappera i grub-btrfs
@@ -752,7 +848,7 @@ do
     echo 'NoDisplay=true' >> ~/.local/share/applications/"$(basename "$f")"
 done
 
-kbuildsycoca6
+XDG_MENU_PREFIX=plasma- kbuildsycoca6 --noincremental
 systemctl --user restart plasma-plasmashell.service
 ```
 
@@ -762,7 +858,7 @@ Przywrócenie:
 rm ~/.local/share/applications/avahi-discover.desktop
 rm ~/.local/share/applications/qv4l2.desktop
 rm ~/.local/share/applications/org.kde.plasma.emojier.desktop
-kbuildsycoca6
+XDG_MENU_PREFIX=plasma- kbuildsycoca6 --noincremental
 ```
 
 ---
@@ -876,40 +972,50 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 
 ## 25.1 Pakiety bazowe po instalacji, opcjonalne
 
-Jeśli chcesz wrócić do wygody ze starego README, ale bez pełnego `plasma-meta`, możesz doinstalować tylko potrzebne rzeczy:
+Sensowny zestaw bez nadmiarowego śmietnika:
 
 ```bash
 sudo pacman -S --needed \
   bash-completion btop fastfetch openssh playerctl \
-  zip unzip unrar p7zip \
-  exfatprogs dosfstools mtools \
-  usbutils lsof net-tools smartmontools traceroute \
-  wireguard-tools networkmanager-openvpn \
-  firewalld
+  zip unzip p7zip \
+  exfatprogs dosfstools \
+  usbutils lsof smartmontools traceroute \
+  wireguard-tools
 ```
 
-Włączenie usług, jeśli ich używasz:
+`firewalld` instaluj w sekcji „Bezpieczne SSH tylko w domu”, jeśli chcesz firewall i SSH ograniczone do domowej sieci LAN.
+
+`unrar`, `mtools`, `net-tools`, `networkmanager-openvpn` instaluj tylko wtedy, gdy faktycznie ich potrzebujesz.
+
+`fstrim.timer` warto mieć na SSD/NVMe:
 
 ```bash
-sudo systemctl enable --now sshd
-sudo systemctl enable --now firewalld
 sudo systemctl enable --now fstrim.timer
 ```
-
-`fstrim.timer` warto mieć na SSD/NVMe.
 
 ---
 
 ## 25.2 Kodeki multimedialne
 
-Minimalny system ma `ffmpeg` jako zależność części KDE/multimediów, ale jeśli chcesz pełniejsze kodeki:
+Minimalny system ma część bibliotek multimedialnych jako zależności KDE, ale do pełniejszej obsługi audio/wideo warto doinstalować:
 
 ```bash
 sudo pacman -S --needed \
-  ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
+  ffmpeg \
+  gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav \
+  gst-plugin-pipewire
 ```
 
-`libdvdcss` instaluj tylko jeśli faktycznie potrzebujesz odtwarzania szyfrowanych DVD:
+Opcjonalnie miniatury filmów i dodatkowe formaty obrazów w KDE/Dolphin:
+
+```bash
+sudo pacman -S --needed \
+  ffmpegthumbs \
+  kimageformats \
+  qt6-imageformats
+```
+
+`libdvdcss` instaluj tylko, jeśli faktycznie potrzebujesz odtwarzania szyfrowanych DVD:
 
 ```bash
 sudo pacman -S --needed libdvdcss
@@ -1141,7 +1247,7 @@ cp /usr/share/applications/brave-browser.desktop ~/.local/share/applications/
 
 sed -i 's|^Exec=.*|Exec=brave --password-store=basic %U|' ~/.local/share/applications/brave-browser.desktop
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
-kbuildsycoca6
+XDG_MENU_PREFIX=plasma- kbuildsycoca6 --noincremental
 ```
 
 Od tej chwili Brave z menu aplikacji użyje `--password-store=basic`.
@@ -1297,7 +1403,7 @@ do
     echo 'NoDisplay=true' >> ~/.local/share/applications/"$(basename "$f")"
 done
 
-kbuildsycoca6
+XDG_MENU_PREFIX=plasma- kbuildsycoca6 --noincremental
 systemctl --user restart plasma-plasmashell.service
 ```
 
@@ -1307,7 +1413,7 @@ Przywrócenie:
 rm ~/.local/share/applications/avahi-discover.desktop
 rm ~/.local/share/applications/qv4l2.desktop
 rm ~/.local/share/applications/org.kde.plasma.emojier.desktop
-kbuildsycoca6
+XDG_MENU_PREFIX=plasma- kbuildsycoca6 --noincremental
 ```
 
 ---
@@ -1653,4 +1759,25 @@ Po wykonaniu opcjonalnych kroków post-install możesz dodatkowo mieć:
 - narzędzia diagnostyczne
 - fix DPTF throttling na Dell Latitude 5421
 
+---
 
+## 25. Aktualizacja istniejącego repo
+
+Obecna instrukcja w repo:
+
+```text
+https://github.com/pietryszak/arch
+```
+
+jest nieaktualna. Ten plik może zastąpić obecny `README.md` albo wejść jako:
+
+```text
+README.md
+docs/arch-btrfs-luks-tpm-snapper.md
+```
+
+Proponowana nazwa:
+
+```text
+README.md
+```
