@@ -1,186 +1,167 @@
-# Arch Linux na Dell Latitude 5421
+# Arch Linux na Dell Latitude 5421 — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
 
-## Btrfs + Snapper + hibernacja + GRUB snapshoty + pełne Plasma + Plasma Login Manager
+Instrukcja powstała po faktycznej instalacji i zawiera poprawki błędów, które wyszły w trakcie.  
+Docelowy system:
 
-Ten przewodnik opisuje czystą instalację Arch Linuksa na **Dell Latitude 5421** z:
-
-* UEFI
-* Btrfs
-* snapshotami przez Snapper
-* osobnymi snapshotami dla `/` i `/home`
-* działającą hibernacją
-* GRUB + grub-btrfs do wybierania snapshotów z menu startowego
-* pełnym KDE Plasma przez `plasma-meta`
-* Plasma Login Manager zamiast SDDM
-* językiem systemu ustawionym na `en_US.UTF-8`
-* polską klawiaturą
-* strefą czasową `Europe/Warsaw`
-
-Docelowa konfiguracja:
-
-* dysk docelowy: `/dev/nvme0n1`
-* pełne wyczyszczenie dysku
-* brak szyfrowania
-* użytkownik: `pietryszak`
-* hostname: `arch`
-
-Ten układ zostawia **`/boot` na Btrfs**, a partycję EFI montuje jako **`/boot/efi`**. Dzięki temu kernel i initramfs pozostają na Btrfs i lepiej pasują do rollbacku snapshotów.
+- Arch Linux
+- UEFI
+- LUKS2 na root
+- TPM2 + PIN do odblokowania LUKS
+- Btrfs z subvolumami
+- Snapper dla `/` i `/home`
+- `grub-btrfs` z bootowalnymi snapshotami w GRUB
+- hibernacja na Btrfs swapfile
+- minimalne KDE Plasma
+- Plasma Login Manager, czyli `plasmalogin`, bez SDDM
+- NetworkManager, Bluetooth, PipeWire/WirePlumber
+- bez `nano`, bez `vim`, używany `neovim`
+- bez `fwupd`, bez Flatpak, bez pełnego KDE Gear
 
 ---
 
-# 1. Układ partycji
+## 0. Założenia
 
-* `nvme0n1p1` — EFI — `1 GiB`
-* `nvme0n1p2` — swap — `40 GiB`
-* `nvme0n1p3` — Btrfs — reszta dysku
+Dysk:
 
----
-
-# 2. Układ subvolume
-
-## Subvolume systemowe
-
-* `@` -> `/`
-* `@home` -> `/home`
-* `@snapshots` -> `/.snapshots`
-* `@home_snapshots` -> `/home/.snapshots`
-* `@log` -> `/var/log`
-* `@cache` -> `/var/cache`
-* `@pkg` -> `/var/cache/pacman/pkg`
-* `@tmp` -> `/var/tmp`
-* `@spool` -> `/var/spool`
-* `@opt` -> `/opt`
-* `@libvirt` -> `/var/lib/libvirt`
-
-## Subvolume użytkownika wyłączone z rollbacku `/home`
-
-* `@mozilla` -> `/home/pietryszak/.mozilla`
-* `@brave` -> `/home/pietryszak/.config/BraveSoftware`
-* `@thunderbird` -> `/home/pietryszak/.thunderbird`
-* `@gnupg` -> `/home/pietryszak/.gnupg`
-* `@ssh` -> `/home/pietryszak/.ssh`
-
----
-
-# 3. Ustawienia BIOS / UEFI
-
-Przed uruchomieniem instalatora z pendrive ustaw:
-
-* tryb bootowania: **UEFI**
-* **Secure Boot: Off**
-* jeśli Linux nie widzi dysku: tryb storage ustaw na **AHCI**
-
----
-
-# 4. Start Arch ISO i połączenie z internetem
-
-Po uruchomieniu Arch ISO:
-
+```bash
+/dev/nvme0n1
 ```
+
+Partycje:
+
+```text
+/dev/nvme0n1p1    EFI        1G      FAT32
+/dev/nvme0n1p2    cryptroot  reszta  LUKS2
+```
+
+W środku LUKS:
+
+```text
+/dev/mapper/cryptroot  Btrfs
+```
+
+Hostname:
+
+```text
+arch
+```
+
+Użytkownik:
+
+```text
+pietryszak
+```
+
+Subvolumy Btrfs:
+
+```text
+@                  /
+@home              /home
+@snapshots         /.snapshots
+@home_snapshots    /home/.snapshots
+@log               /var/log
+@cache             /var/cache
+@pkg               /var/cache/pacman/pkg
+@tmp               /var/tmp
+@spool             /var/spool
+@opt               /opt
+@swap              /swap
+@libvirt           /var/lib/libvirt
+@mozilla           /home/pietryszak/.mozilla
+@brave             /home/pietryszak/.config/BraveSoftware
+@thunderbird       /home/pietryszak/.thunderbird
+@ssh               /home/pietryszak/.ssh
+@gnupg             /home/pietryszak/.gnupg
+```
+
+---
+
+## 1. Start z Arch ISO
+
+```bash
+loadkeys pl
 timedatectl set-ntp true
 ```
 
-Jeśli masz Ethernet:
+Sprawdzenie UEFI:
 
-```
-ping -c 3 archlinux.org
+```bash
+ls /sys/firmware/efi/efivars
 ```
 
-Jeśli potrzebujesz Wi-Fi:
+Połączenie Wi-Fi z live ISO:
 
-```
+```bash
 iwctl
 ```
 
 W `iwctl`:
 
-```
+```text
 device list
 station wlan0 scan
 station wlan0 get-networks
-station wlan0 connect "NAZWA_SIECI"
+station wlan0 connect NAZWA_WIFI
 exit
 ```
 
-Potem sprawdź połączenie:
+Test:
 
-```
+```bash
 ping -c 3 archlinux.org
 ```
 
 ---
 
-# 5. Włączenie SSH na live ISO
+## 2. Partycjonowanie
 
-Na live ISO ustaw hasło roota i uruchom SSH:
+Uwaga: to kasuje dysk.
 
-```
-passwd
-systemctl start sshd
-ip -br a
-```
+```bash
+DISK=/dev/nvme0n1
 
-Z drugiego komputera połącz się tak:
+sgdisk --zap-all "$DISK"
+wipefs -af "$DISK"
 
-```
-ssh root@ADRES_IP
-```
+sgdisk -n 1:0:+1G -t 1:ef00 -c 1:"EFI" "$DISK"
+sgdisk -n 2:0:0   -t 2:8309 -c 2:"CRYPTROOT" "$DISK"
 
----
-
-# 6. Sprawdzenie trybu bootu i dysków
-
-```
-ls /sys/firmware/efi/efivars >/dev/null && echo UEFI_OK || echo NIE_UEFI
-lsblk -e7 -o NAME,SIZE,TYPE,MODEL
-free -h
-lspci | grep -E "VGA|3D|Display"
+partprobe "$DISK"
 ```
 
-Ten przewodnik zakłada, że:
+Format EFI:
 
-* pendrive instalacyjny to `sda`
-* dysk docelowy to `/dev/nvme0n1`
-
----
-
-# 7. Partycjonowanie dysku
-
-> **Uwaga:** ten krok kasuje cały `/dev/nvme0n1`.
-
-```
-set -e
-
-umount -R /mnt 2>/dev/null || true
-swapoff -a 2>/dev/null || true
-
-sgdisk --zap-all /dev/nvme0n1
-sgdisk -n 1:0:+1G   -t 1:ef00 -c 1:EFI  /dev/nvme0n1
-sgdisk -n 2:0:+40G  -t 2:8200 -c 2:swap /dev/nvme0n1
-sgdisk -n 3:0:0     -t 3:8300 -c 3:arch /dev/nvme0n1
-
-partprobe /dev/nvme0n1
-sleep 2
-
-lsblk -f /dev/nvme0n1
+```bash
+mkfs.fat -F32 -n EFI ${DISK}p1
 ```
 
 ---
 
-# 8. Formatowanie i tworzenie subvolume Btrfs
+## 3. LUKS2
 
-```
-mkfs.fat -F32 /dev/nvme0n1p1
-mkswap /dev/nvme0n1p2
-swapon /dev/nvme0n1p2
-mkfs.btrfs -f /dev/nvme0n1p3
+```bash
+cryptsetup luksFormat --type luks2 ${DISK}p2
+cryptsetup open ${DISK}p2 cryptroot
 ```
 
-Tworzenie wszystkich subvolume na top-level Btrfs:
+Sprawdzenie:
 
+```bash
+lsblk -f
 ```
-mount /dev/nvme0n1p3 /mnt
 
+---
+
+## 4. Btrfs i subvolumy
+
+```bash
+mkfs.btrfs -f -L ARCH /dev/mapper/cryptroot
+mount /dev/mapper/cryptroot /mnt
+```
+
+Tworzenie subvolumów:
+
+```bash
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
 btrfs subvolume create /mnt/@snapshots
@@ -191,738 +172,781 @@ btrfs subvolume create /mnt/@pkg
 btrfs subvolume create /mnt/@tmp
 btrfs subvolume create /mnt/@spool
 btrfs subvolume create /mnt/@opt
+btrfs subvolume create /mnt/@swap
 btrfs subvolume create /mnt/@libvirt
 btrfs subvolume create /mnt/@mozilla
 btrfs subvolume create /mnt/@brave
 btrfs subvolume create /mnt/@thunderbird
-btrfs subvolume create /mnt/@gnupg
 btrfs subvolume create /mnt/@ssh
+btrfs subvolume create /mnt/@gnupg
+```
 
+```bash
 umount /mnt
 ```
 
 ---
 
-# 9. Montowanie docelowego układu systemowego
+## 5. Montowanie systemu
 
-Na tym etapie montujemy wszystko oprócz subvolume specyficznych dla użytkownika. Te zamontujemy dopiero po utworzeniu użytkownika.
+Opcje:
 
-Ważna kolejność:
-
-* najpierw montujesz główne subvolume, takie jak `@home` i `@cache`
-* dopiero potem tworzysz katalogi wewnątrz nich, takie jak `/home/.snapshots` i `/var/cache/pacman/pkg`
-* na końcu montujesz `@home_snapshots` i `@pkg`
-
+```bash
+BTRFS_OPTS="noatime,compress=zstd:3,ssd,space_cache=v2,discard=async"
+BTRFS_SWAP_OPTS="noatime,ssd,space_cache=v2,discard=async"
 ```
-mount -o subvol=@,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt
 
-mkdir -p /mnt/{boot/efi,home,.snapshots,opt}
-mkdir -p /mnt/var/log
-mkdir -p /mnt/var/cache
-mkdir -p /mnt/var/tmp
-mkdir -p /mnt/var/spool
-mkdir -p /mnt/var/lib/libvirt
+Root:
 
-mount -o subvol=@home,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home
-mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshots
-mount -o subvol=@log,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/log
-mount -o subvol=@cache,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache
-mount -o subvol=@tmp,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/tmp
-mount -o subvol=@spool,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/spool
-mount -o subvol=@opt,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/opt
-mount -o subvol=@libvirt,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/lib/libvirt
+```bash
+mount -o "$BTRFS_OPTS",subvol=@ /dev/mapper/cryptroot /mnt
+```
 
+Katalogi:
+
+```bash
+mkdir -p /mnt/{boot,home,.snapshots,var/log,var/cache/pacman/pkg,var/tmp,var/spool,opt,swap,var/lib/libvirt}
+```
+
+Mounty:
+
+```bash
+mount ${DISK}p1 /mnt/boot
+
+mount -o "$BTRFS_OPTS",subvol=@home /dev/mapper/cryptroot /mnt/home
 mkdir -p /mnt/home/.snapshots
+mount -o "$BTRFS_OPTS",subvol=@home_snapshots /dev/mapper/cryptroot /mnt/home/.snapshots
+
+mount -o "$BTRFS_OPTS",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
+mount -o "$BTRFS_OPTS",subvol=@log /dev/mapper/cryptroot /mnt/var/log
+
+mount -o "$BTRFS_OPTS",subvol=@cache /dev/mapper/cryptroot /mnt/var/cache
 mkdir -p /mnt/var/cache/pacman/pkg
+mount -o "$BTRFS_OPTS",subvol=@pkg /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
 
-mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/.snapshots
-mount -o subvol=@pkg,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/var/cache/pacman/pkg
-mount /dev/nvme0n1p1 /mnt/boot/efi
+mount -o "$BTRFS_OPTS",subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp
+mount -o "$BTRFS_OPTS",subvol=@spool /dev/mapper/cryptroot /mnt/var/spool
+mount -o "$BTRFS_OPTS",subvol=@opt /dev/mapper/cryptroot /mnt/opt
+mount -o "$BTRFS_SWAP_OPTS",subvol=@swap /dev/mapper/cryptroot /mnt/swap
+mount -o "$BTRFS_OPTS",subvol=@libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
+```
 
-findmnt -R /mnt
-swapon --show
+Ważna poprawka z instalacji: po zamontowaniu `/mnt/home` trzeba dopiero utworzyć `/mnt/home/.snapshots`, bo wcześniejszy katalog może zostać przykryty mountem. To samo dotyczy `/mnt/var/cache/pacman/pkg` po zamontowaniu `/mnt/var/cache`.
+
+Sprawdzenie:
+
+```bash
+findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
 ```
 
 ---
 
-# 10. Instalacja pakietów
+## 6. Minimalny pacstrap
 
-Instalujemy wszystko, co jest dostępne w oficjalnych repozytoriach — bazę systemu, GRUB, sieć, dźwięk, pełne KDE Plasma, Snapper, narzędzia, przeglądarki, Bluetooth, drukowanie, Plymouth, kodeki, fonty, obsługę iPhone'a, firewall i narzędzia deweloperskie.
+Finalna użyta idea: minimum KDE, ale używalne — z terminalem i menedżerem plików.  
+Bez `sddm`, bez `nano`, bez `vim`, bez `fwupd`, bez Flatpak.
 
-Pakiety z AUR (Brave, sterowniki Brother, xpadneo, motyw Plymouth) instalujemy dopiero po restarcie, bo `makepkg` nie działa jako root.
-
-> **Uwaga:** `ntfs-3g` nie jest potrzebne — kernelowy sterownik `ntfs3` (wbudowany od 5.15) obsługuje pełny odczyt/zapis partycji NTFS.
-
-```
+```bash
 pacstrap -K /mnt \
-  base base-devel linux linux-firmware intel-ucode btrfs-progs \
+  base linux linux-headers linux-firmware \
+  intel-ucode \
+  btrfs-progs cryptsetup tpm2-tools \
   grub efibootmgr \
-  networkmanager openssh sudo neovim bash-completion wget git curl btop fastfetch man-db man-pages \
-  pipewire-audio pipewire-alsa pipewire-pulse wireplumber sof-firmware \
-  plasma-meta \
-  dolphin konsole \
-  xdg-user-dirs xdg-desktop-portal power-profiles-daemon \
-  snapper grub-btrfs inotify-tools \
-  cups system-config-printer avahi nss-mdns sane simple-scan \
-  firefox thunderbird \
-  bluez bluez-utils bluez-obex \
-  linux-headers dkms \
-  plymouth plymouth-kcm breeze-grub \
-  playerctl msr-tools \
-  ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav libdvdcss \
-  zip unzip unrar p7zip \
-  exfatprogs dosfstools mtools \
-  gvfs gvfs-afc gvfs-gphoto2 \
-  libimobiledevice usbmuxd ifuse \
-  networkmanager-openvpn wireguard-tools \
-  fwupd \
-  noto-fonts noto-fonts-emoji ttf-liberation ttf-dejavu \
-  xdg-utils usbutils lsof net-tools smartmontools traceroute \
-  firewalld
+  networkmanager wireless-regdb \
+  sudo neovim git curl wget man-db man-pages \
+  pipewire wireplumber pipewire-pulse pipewire-alsa \
+  bluez bluez-utils \
+  sof-firmware alsa-utils \
+  mesa vulkan-intel intel-media-driver \
+  snapper snap-pac grub-btrfs \
+  plasma-desktop plasma-login-manager \
+  plasma-nm plasma-pa powerdevil bluedevil kscreen \
+  xdg-desktop-portal-kde \
+  breeze-gtk kde-gtk-config \
+  noto-fonts noto-fonts-emoji ttf-dejavu \
+  konsole dolphin
 ```
 
-> **Uwaga:** `plasma-meta` dociąga pełny zestaw komponentów Plasma, więc instalacja będzie wyraźnie większa niż przy ręcznie skrojonym, minimalnym zestawie.  
-> **Uwaga:** podczas `pacstrap` może pojawić się ostrzeżenie z `mkinitcpio` o brakującym `/etc/vconsole.conf`.  
-> To jest normalne na tym etapie, bo plik zostanie utworzony dopiero w późniejszej konfiguracji systemu.  
-> Właściwe `mkinitcpio -P` i tak wykonujesz później, już po ustawieniu locale, keymap i hibernacji.
+Uwagi:
+
+- `plasma-login-manager` daje usługę `plasmalogin.service`.
+- Nie instalować `sddm`.
+- `qt6-tools`, `avahi`, `v4l-utils`, `emoji selector` mogą potem pojawić się w menu jako „śmieci”, ale są zależnościami ważnych komponentów:
+  - `avahi` wymagane m.in. przez `pipewire-pulse`
+  - `qt6-tools` wymagane przez `kwin` i `plasma-workspace`
+  - `v4l-utils` wymagane przez `ffmpeg`
+  - emoji selector jest częścią `plasma-desktop`
+- Tych pakietów nie usuwać. Ewentualnie ukryć wpisy `.desktop`.
 
 ---
 
-# 11. Podstawowa konfiguracja systemu i utworzenie użytkownika
+## 7. fstab i chroot
 
-Wejdź do chroota:
-
+```bash
+genfstab -U /mnt >> /mnt/etc/fstab
+arch-chroot /mnt
 ```
-arch-chroot /mnt /bin/bash
-```
 
-W chroocie wykonaj:
+Hostname:
 
-```
-ln -sf /usr/share/zoneinfo/Europe/Warsaw /etc/localtime
-hwclock --systohc
-
-sed -i 's/^#\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
-locale-gen
-
-printf 'LANG=en_US.UTF-8\n' > /etc/locale.conf
-printf 'KEYMAP=pl\n' > /etc/vconsole.conf
-
-printf 'arch\n' > /etc/hostname
+```bash
+echo arch > /etc/hostname
 
 cat > /etc/hosts <<'EOF'
 127.0.0.1 localhost
-::1 localhost
+::1       localhost
 127.0.1.1 arch.localdomain arch
 EOF
+```
 
-sed -i '/^# %wheel ALL=(ALL:ALL) ALL/s/^# //' /etc/sudoers
+Locale i konsola:
 
-useradd -m -G wheel -s /bin/bash pietryszak
+```bash
+cat > /etc/vconsole.conf <<'EOF'
+KEYMAP=pl
+EOF
+
+ln -sf /usr/share/zoneinfo/Europe/Warsaw /etc/localtime
+hwclock --systohc
+
+sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+sed -i 's/^#pl_PL.UTF-8 UTF-8/pl_PL.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen
+
+cat > /etc/locale.conf <<'EOF'
+LANG=en_US.UTF-8
+LC_TIME=pl_PL.UTF-8
+LC_MONETARY=pl_PL.UTF-8
+LC_MEASUREMENT=pl_PL.UTF-8
+LC_PAPER=pl_PL.UTF-8
+EOF
+```
+
+Ważna poprawka z instalacji: jeśli `mkinitcpio` przy `pacstrap` krzyczy o braku `/etc/vconsole.conf`, to po utworzeniu powyższego pliku trzeba ponownie wykonać:
+
+```bash
+mkinitcpio -P
+```
+
+Warning o `qat_6xxx` można zignorować na Dell Latitude 5421.
+
+---
+
+## 8. Użytkownik i sudo
+
+```bash
 passwd
+
+useradd -m -G wheel,audio,video,input,storage,lp,network,power -s /bin/bash pietryszak
 passwd pietryszak
+
+grep -q '^%wheel ALL=(ALL:ALL) ALL' /etc/sudoers || sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 ```
 
-Wyjdź z chroota:
+Sprawdzenie:
 
+```bash
+id pietryszak
+passwd -S root
+passwd -S pietryszak
 ```
+
+---
+
+## 9. Poprawka `/swap` w fstab
+
+Po `genfstab` trzeba usunąć `compress=zstd:3` z wpisu `/swap`.
+
+```bash
+sed -i '\|[[:space:]]/swap[[:space:]]| s/,compress=zstd:3//' /etc/fstab
+grep -E '[[:space:]]/swap[[:space:]]' /etc/fstab
+```
+
+Poprawny wpis `/swap` ma wyglądać mniej więcej tak:
+
+```text
+UUID=... /swap btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=/@swap 0 0
+```
+
+Bez `compress=zstd:3`.
+
+---
+
+## 10. Swapfile pod hibernację — ważna poprawiona metoda
+
+W trakcie instalacji wyszło, że `btrfs filesystem mkswapfile` może wywalić:
+
+```text
+ERROR: cannot set NOCOW flag: Invalid argument
+```
+
+U nas dodatkowo problem pojawił się po ustawieniu:
+
+```bash
+btrfs property set /swap compression none
+```
+
+To ustawiło atrybut `m` i blokowało `chattr +C`.
+
+Finalna poprawiona metoda:
+
+```bash
+swapoff -a 2>/dev/null || true
+rm -f /swap/swapfile
+
+# usuń problematyczny atrybut m/no-compress, jeśli wcześniej został ustawiony
+chattr -m /swap 2>/dev/null || true
+btrfs property set /swap compression "" 2>/dev/null || true
+
+touch /swap/swapfile
+chattr +C /swap/swapfile
+lsattr /swap/swapfile
+```
+
+Oczekiwane:
+
+```text
+---------------C------ /swap/swapfile
+```
+
+Tworzenie pliku 40 GiB:
+
+```bash
+dd if=/dev/zero of=/swap/swapfile bs=1M count=40960 status=progress
+chmod 600 /swap/swapfile
+mkswap /swap/swapfile
+swapon /swap/swapfile
+
+grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults 0 0" >> /etc/fstab
+
+swapon --show
+```
+
+Oczekiwane:
+
+```text
+NAME           TYPE SIZE USED PRIO
+/swap/swapfile file  40G   0B   -1
+```
+
+Offset do hibernacji:
+
+```bash
+btrfs inspect-internal map-swapfile -r /swap/swapfile
+```
+
+W tej instalacji wyszło:
+
+```text
+1549568
+```
+
+Nie wpisywać na ślepo — na innej instalacji policzyć ponownie.
+
+---
+
+## 11. mkinitcpio pod LUKS + systemd initramfs
+
+Ustawienie hooków bez ręcznej edycji:
+
+```bash
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/' /etc/mkinitcpio.conf
+
+grep '^HOOKS=' /etc/mkinitcpio.conf
+mkinitcpio -P
+```
+
+Oczekiwane:
+
+```text
+HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)
+```
+
+---
+
+## 12. UUID-y, resume offset, crypttab.initramfs
+
+```bash
+CRYPT_UUID=$(blkid -s UUID -o value /dev/nvme0n1p2)
+ROOT_UUID=$(findmnt -no UUID /)
+RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r /swap/swapfile)
+
+echo "CRYPT_UUID=$CRYPT_UUID"
+echo "ROOT_UUID=$ROOT_UUID"
+echo "RESUME_OFFSET=$RESUME_OFFSET"
+```
+
+W tej instalacji było:
+
+```text
+CRYPT_UUID=bc4080e7-6014-4803-ae83-b86f8377bced
+ROOT_UUID=572457ed-c62c-4a3f-8d14-891559bd3ea2
+RESUME_OFFSET=1549568
+```
+
+`/etc/crypttab.initramfs`:
+
+```bash
+cat > /etc/crypttab.initramfs <<EOF
+cryptroot UUID=${CRYPT_UUID} none tpm2-device=auto
+EOF
+
+cat /etc/crypttab.initramfs
+```
+
+---
+
+## 13. GRUB kernel params
+
+```bash
+sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 rd.luks.name=${CRYPT_UUID}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ resume=UUID=${ROOT_UUID} resume_offset=${RESUME_OFFSET}\"|" /etc/default/grub
+
+grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
+```
+
+Instalacja GRUB:
+
+```bash
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=ARCH
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Ostrzeżenie o `os-prober` można zignorować, jeśli nie ma dual-boota.
+
+---
+
+## 14. TPM2 + PIN
+
+Sprawdzenie TPM:
+
+```bash
+systemd-cryptenroll --tpm2-device=list
+```
+
+W tej instalacji:
+
+```text
+/dev/tpmrm0 STM0125:00 tpm_tis
+```
+
+Dodanie TPM2 + PIN:
+
+```bash
+systemd-cryptenroll /dev/nvme0n1p2 --tpm2-device=auto --tpm2-with-pin=yes
+```
+
+Sprawdzenie:
+
+```bash
+systemd-cryptenroll /dev/nvme0n1p2
+```
+
+Oczekiwane:
+
+```text
+SLOT TYPE
+   0 password
+   1 tpm2
+```
+
+Po enrolowaniu:
+
+```bash
+mkinitcpio -P
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+### Opcjonalnie: TPM bez PIN
+
+Da się, ale jest mniej bezpieczne.  
+Zmiana po instalacji:
+
+```bash
+sudo systemd-cryptenroll /dev/nvme0n1p2 --wipe-slot=tpm2
+sudo systemd-cryptenroll /dev/nvme0n1p2 --tpm2-device=auto
+sudo systemd-cryptenroll /dev/nvme0n1p2
+sudo mkinitcpio -P
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Rekomendacja: na laptopie zostawić TPM2 + PIN.
+
+---
+
+## 15. Usługi
+
+Włączenie podstaw:
+
+```bash
+systemctl enable NetworkManager
+systemctl enable bluetooth
+systemctl enable plasmalogin.service
+```
+
+Sprawdzenie login managera:
+
+```bash
+systemctl list-unit-files | grep -Ei 'plasma|login'
+```
+
+Oczekiwane:
+
+```text
+plasmalogin.service
+```
+
+---
+
+## 16. Snapper root — poprawiona metoda z `--no-dbus`
+
+W chroot Snapper bez `--no-dbus` wywalał:
+
+```text
+Failure (org.freedesktop.DBus.Error.ServiceUnknown)
+```
+
+Dlatego w chroot używać `snapper --no-dbus`.
+
+Root:
+
+```bash
+umount /.snapshots 2>/dev/null || true
+rm -rf /.snapshots
+
+snapper --no-dbus -c root create-config /
+
+# Snapper tworzy własny subvolume /.snapshots, więc go usuwamy
+btrfs subvolume delete /.snapshots
+
+# Przywracamy mountpoint dla przygotowanego @snapshots
+mkdir /.snapshots
+mount /.snapshots
+
+chmod 750 /.snapshots
+
+snapper --no-dbus -c root create --description "fresh encrypted Arch install"
+snapper --no-dbus -c root list
+```
+
+---
+
+## 17. Snapper home — poprawiona metoda z `--no-dbus`
+
+```bash
+umount /home/.snapshots 2>/dev/null || true
+rm -rf /home/.snapshots
+
+snapper --no-dbus -c home create-config /home
+
+btrfs subvolume delete /home/.snapshots
+
+mkdir /home/.snapshots
+mount /home/.snapshots
+
+chmod 750 /home/.snapshots
+
+snapper --no-dbus -c home create --description "fresh encrypted home snapshot"
+snapper --no-dbus -c home list
+```
+
+---
+
+## 18. Timery Snappera i grub-btrfs
+
+```bash
+systemctl enable snapper-timeline.timer
+systemctl enable snapper-cleanup.timer
+systemctl enable grub-btrfsd.service
+```
+
+Po pierwszych snapshotach:
+
+```bash
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Oczekiwane:
+
+```text
+Detecting snapshots ...
+Found snapshot: ... @snapshots/1/snapshot ...
+```
+
+---
+
+## 19. Finalny check przed rebootem
+
+```bash
+cat /etc/fstab | grep -E ' / |/boot|/home|/swap|swapfile'
+grep -E '[[:space:]]/[[:space:]]+btrfs' /etc/fstab
+
+cat /etc/crypttab.initramfs
+systemd-cryptenroll /dev/nvme0n1p2
+systemctl is-enabled NetworkManager bluetooth plasmalogin.service
+swapon --show
+
+grep '^HOOKS=' /etc/mkinitcpio.conf
+grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
+
+snapper --no-dbus -c root list
+snapper --no-dbus -c home list
+```
+
+Ostatnie generowanie:
+
+```bash
+mkinitcpio -P
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Wyjście:
+
+```bash
 exit
 ```
 
----
+Jeśli `/mnt/swap` jest busy:
 
-# 12. Montowanie subvolume specyficznych dla użytkownika
-
-Teraz, gdy użytkownik już istnieje i ma poprawne `/home`, można zamontować subvolume wyłączone ze snapshotów `/home`.
-
-```
-mkdir -p /mnt/home/pietryszak/.config/BraveSoftware
-mkdir -p /mnt/home/pietryszak/.mozilla
-mkdir -p /mnt/home/pietryszak/.thunderbird
-mkdir -p /mnt/home/pietryszak/.gnupg
-mkdir -p /mnt/home/pietryszak/.ssh
-
-mount -o subvol=@mozilla,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.mozilla
-mount -o subvol=@brave,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.config/BraveSoftware
-mount -o subvol=@thunderbird,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.thunderbird
-mount -o subvol=@gnupg,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.gnupg
-mount -o subvol=@ssh,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/pietryszak/.ssh
-```
-
-Nadaj właściciela i poprawne uprawnienia:
-
-```
-arch-chroot /mnt chown -R pietryszak:pietryszak /home/pietryszak
-arch-chroot /mnt chmod 700 /home/pietryszak/.gnupg
-arch-chroot /mnt chmod 700 /home/pietryszak/.ssh
-```
-
----
-
-# 13. Generowanie fstab
-
-Dopiero teraz, gdy wszystkie docelowe mountpointy są już zamontowane, generujemy finalny `fstab`.
-
-```
-genfstab -U /mnt > /mnt/etc/fstab
-cat /mnt/etc/fstab
-```
-
-Powinny pojawić się wpisy dla:
-
-* `/`
-* `/home`
-* `/.snapshots`
-* `/home/.snapshots`
-* `/var/log`
-* `/var/cache`
-* `/var/cache/pacman/pkg`
-* `/var/tmp`
-* `/var/spool`
-* `/opt`
-* `/var/lib/libvirt`
-* `/home/pietryszak/.mozilla`
-* `/home/pietryszak/.config/BraveSoftware`
-* `/home/pietryszak/.thunderbird`
-* `/home/pietryszak/.gnupg`
-* `/home/pietryszak/.ssh`
-* `/boot/efi`
-* swap
-
----
-
-# 14. Konfiguracja hibernacji i Plymouth
-
-Ustawienie `resume=UUID=...` i `splash` dla GRUB oraz hooków `plymouth` i `resume` w `mkinitcpio`:
-
-```
-arch-chroot /mnt /bin/bash <<'EOF'
-set -e
-
-SWAP_UUID=$(blkid -s UUID -o value /dev/nvme0n1p2)
-
-sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet splash resume=UUID=${SWAP_UUID}\"/" /etc/default/grub
-
-# Dodaj motyw GRUB Breeze
-grep -q '^GRUB_THEME=' /etc/default/grub \
-  && sed -i 's|^GRUB_THEME=.*|GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"|' /etc/default/grub \
-  || printf 'GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"\n' >> /etc/default/grub
-
-# Dodaj hooki plymouth i resume do mkinitcpio
-# Wynikowa kolejność: ... block plymouth filesystems resume fsck
-sed -i \
-  -e 's/\<filesystems\>/plymouth filesystems/' \
-  -e 's/\<fsck\>/resume fsck/' \
-  /etc/mkinitcpio.conf
-
-# Upewnij się, że plymouth i resume nie są zduplikowane
-sed -i 's/\(plymouth \)\+/plymouth /g; s/\(resume \)\+/resume /g' /etc/mkinitcpio.conf
-
-mkinitcpio -P
-EOF
-```
-
----
-
-# 15. Konfiguracja Snappera dla `/`
-
-## 15.1 Utworzenie konfiguracji root bez D-Bus
-
-> W chroocie trzeba użyć `--no-dbus`, bo bez tego Snapper może wywalić błąd `org.freedesktop.DBus.Error.ServiceUnknown`.
-
-```
-umount /mnt/.snapshots
-rmdir /mnt/.snapshots
-
-arch-chroot /mnt snapper --no-dbus -c root create-config /
-```
-
-## 15.2 Usunięcie `/.snapshots` utworzonego w `@` i ponowne podpięcie dedykowanego `@snapshots`
-
-```
-mkdir -p /mnt/.btrfs-root
-mount -o subvolid=5 /dev/nvme0n1p3 /mnt/.btrfs-root
-
-btrfs subvolume delete /mnt/.btrfs-root/@/.snapshots
-
-umount /mnt/.btrfs-root
-rmdir /mnt/.btrfs-root
-
-mkdir -p /mnt/.snapshots
-mount -o subvol=@snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/.snapshots
-```
-
----
-
-# 16. Konfiguracja Snappera dla `/home`
-
-## 16.1 Utworzenie konfiguracji home bez D-Bus
-
-```
-umount /mnt/home/.snapshots
-rmdir /mnt/home/.snapshots
-
-arch-chroot /mnt snapper --no-dbus -c home create-config /home
-```
-
-## 16.2 Usunięcie `/home/.snapshots` utworzonego w `@home` i ponowne podpięcie dedykowanego `@home_snapshots`
-
-```
-mkdir -p /mnt/.btrfs-root
-mount -o subvolid=5 /dev/nvme0n1p3 /mnt/.btrfs-root
-
-btrfs subvolume delete /mnt/.btrfs-root/@home/.snapshots
-
-umount /mnt/.btrfs-root
-rmdir /mnt/.btrfs-root
-
-mkdir -p /mnt/home/.snapshots
-mount -o subvol=@home_snapshots,compress=zstd:1,noatime /dev/nvme0n1p3 /mnt/home/.snapshots
-```
-
----
-
-# 17. Włączenie timeline i cleanup dla Snappera
-
-`snap-pac` instalujemy dopiero po skonfigurowaniu Snappera dla `/` i `/home`, żeby hooki pacmana nie próbowały robić snapshotów zbyt wcześnie.
-
-Ustawienia dla `root`:
-
-```
-arch-chroot /mnt sed -i \
-  -e 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="yes"/' \
-  -e 's/^TIMELINE_CLEANUP=.*/TIMELINE_CLEANUP="yes"/' \
-  -e 's/^NUMBER_CLEANUP=.*/NUMBER_CLEANUP="yes"/' \
-  -e 's/^NUMBER_LIMIT=.*/NUMBER_LIMIT="10"/' \
-  -e 's/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' \
-  -e 's/^TIMELINE_LIMIT_HOURLY=.*/TIMELINE_LIMIT_HOURLY="10"/' \
-  -e 's/^TIMELINE_LIMIT_DAILY=.*/TIMELINE_LIMIT_DAILY="7"/' \
-  -e 's/^TIMELINE_LIMIT_WEEKLY=.*/TIMELINE_LIMIT_WEEKLY="4"/' \
-  -e 's/^TIMELINE_LIMIT_MONTHLY=.*/TIMELINE_LIMIT_MONTHLY="3"/' \
-  -e 's/^TIMELINE_LIMIT_YEARLY=.*/TIMELINE_LIMIT_YEARLY="0"/' \
-  -e 's/^EMPTY_PRE_POST_CLEANUP=.*/EMPTY_PRE_POST_CLEANUP="yes"/' \
-  /etc/snapper/configs/root
-```
-
-Ustawienia dla `home`:
-
-```
-arch-chroot /mnt sed -i \
-  -e 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="yes"/' \
-  -e 's/^TIMELINE_CLEANUP=.*/TIMELINE_CLEANUP="yes"/' \
-  -e 's/^NUMBER_CLEANUP=.*/NUMBER_CLEANUP="yes"/' \
-  -e 's/^NUMBER_LIMIT=.*/NUMBER_LIMIT="10"/' \
-  -e 's/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' \
-  -e 's/^TIMELINE_LIMIT_HOURLY=.*/TIMELINE_LIMIT_HOURLY="10"/' \
-  -e 's/^TIMELINE_LIMIT_DAILY=.*/TIMELINE_LIMIT_DAILY="7"/' \
-  -e 's/^TIMELINE_LIMIT_WEEKLY=.*/TIMELINE_LIMIT_WEEKLY="4"/' \
-  -e 's/^TIMELINE_LIMIT_MONTHLY=.*/TIMELINE_LIMIT_MONTHLY="3"/' \
-  -e 's/^TIMELINE_LIMIT_YEARLY=.*/TIMELINE_LIMIT_YEARLY="0"/' \
-  -e 's/^EMPTY_PRE_POST_CLEANUP=.*/EMPTY_PRE_POST_CLEANUP="yes"/' \
-  /etc/snapper/configs/home
-```
-
-Włączenie timerów i utworzenie pierwszych snapshotów:
-
-```
-arch-chroot /mnt systemctl enable snapper-timeline.timer
-arch-chroot /mnt systemctl enable snapper-cleanup.timer
-
-arch-chroot /mnt snapper --no-dbus -c root create -d "fresh-install-root"
-arch-chroot /mnt snapper --no-dbus -c home create -d "fresh-install-home"
-
-arch-chroot /mnt pacman -S --noconfirm snap-pac
-
-arch-chroot /mnt snapper --no-dbus -c root list
-arch-chroot /mnt snapper --no-dbus -c home list
-```
-
----
-
-# 18. Instalacja GRUB i włączenie usług systemowych
-
-```
-arch-chroot /mnt /bin/bash <<'EOF'
-set -e
-
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
-grub-mkconfig -o /boot/grub/grub.cfg
-
-systemctl enable grub-btrfsd.service
-systemctl enable NetworkManager
-systemctl enable sshd
-systemctl enable power-profiles-daemon
-systemctl enable plasmalogin.service
-systemctl enable cups.service
-systemctl enable avahi-daemon.service
-systemctl enable bluetooth.service
-systemctl enable fstrim.timer
-systemctl enable fwupd-refresh.timer
-systemctl enable firewalld.service
-EOF
-```
-
----
-
-# 19. Ostatnia kontrola przed restartem
-
-```
-arch-chroot /mnt cat /etc/locale.conf
-arch-chroot /mnt cat /etc/vconsole.conf
-arch-chroot /mnt cat /etc/hostname
-arch-chroot /mnt grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
-arch-chroot /mnt grep '^GRUB_THEME' /etc/default/grub
-arch-chroot /mnt grep HOOKS /etc/mkinitcpio.conf
-arch-chroot /mnt systemctl is-enabled plasmalogin.service
-arch-chroot /mnt systemctl is-enabled grub-btrfsd.service
-arch-chroot /mnt systemctl is-enabled cups.service
-arch-chroot /mnt systemctl is-enabled avahi-daemon.service
-arch-chroot /mnt systemctl is-enabled bluetooth.service
-arch-chroot /mnt systemctl is-enabled fstrim.timer
-arch-chroot /mnt systemctl is-enabled fwupd-refresh.timer
-arch-chroot /mnt systemctl is-enabled firewalld.service
-arch-chroot /mnt snapper --no-dbus -c root list
-arch-chroot /mnt snapper --no-dbus -c home list
-```
-
-Powinno wyjść mniej więcej:
-
-* `LANG=en_US.UTF-8`
-* `KEYMAP=pl`
-* hostname `arch`
-* `resume=UUID=...` i `splash`
-* `GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"`
-* `plymouth` i `resume` w HOOKS
-* `plasmalogin.service` = `enabled`
-* `grub-btrfsd.service` = `enabled`
-* `cups.service` = `enabled`
-* `avahi-daemon.service` = `enabled`
-* `bluetooth.service` = `enabled`
-* `fstrim.timer` = `enabled`
-* `fwupd-refresh.timer` = `enabled`
-* `firewalld.service` = `enabled`
-* snapshot `fresh-install-root`
-* snapshot `fresh-install-home`
-
----
-
-# 20. Restart
-
-```
+```bash
+swapoff /mnt/swap/swapfile 2>/dev/null || swapoff -a
 umount -R /mnt
-swapoff /dev/nvme0n1p2
 reboot
 ```
 
-Wyjmij pendrive instalacyjny.
-
 ---
 
-# 21. Kontrola po pierwszym starcie
+## 20. Po pierwszym bootowaniu
 
-Po zalogowaniu do zainstalowanego systemu:
+Po zalogowaniu:
 
-```
-sudo cat /proc/cmdline
-sudo swapon --show
+```bash
+cat /proc/cmdline
+swapon --show
+findmnt -R /
 sudo snapper -c root list
 sudo snapper -c home list
-sudo systemctl status grub-btrfsd.service --no-pager
-sudo grep -n "submenu 'Arch Linux snapshots'" /boot/grub/grub.cfg
+cat /sys/power/state
 ```
 
-To potwierdza:
+Jeśli jest:
 
-* aktywne `resume=UUID=...`
-* aktywny swap
-* działającego Snappera dla `/`
-* działającego Snappera dla `/home`
-* działające submenu snapshotów w GRUB-ie
-
----
-
-# 22. Test hibernacji
-
-Najprostszy test:
-
+```text
+freeze mem disk
 ```
-sudo systemctl hibernate
+
+test hibernacji:
+
+```bash
+systemctl hibernate
 ```
 
 ---
 
-# 23. Snapshot bazowy po udanej instalacji
+## 21. Baseline snapshot po pierwszych zmianach
 
-Po pierwszym poprawnym starcie dobrze od razu zrobić snapshot bazowy:
+Po zainstalowaniu i drobnych zmianach wykonano baseline:
 
+```bash
+sudo snapper -c root create --description "baseline before system tweaks"
+sudo snapper -c home create --description "baseline home before tweaks"
 ```
-sudo snapper -c root create -d "working-base-root"
-sudo snapper -c home create -d "working-base-home"
 
-sudo snapper -c root list
-sudo snapper -c home list
+W tej instalacji:
+
+```text
+root snapshot: 8
+home snapshot: 2
 ```
+
+Oznaczenie jako important:
+
+```bash
+sudo snapper -c root modify --cleanup-algorithm important 8
+sudo snapper -c home modify --cleanup-algorithm important 2
+```
+
+Odświeżenie GRUB:
+
+```bash
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Oczekiwane:
+
+```text
+Found snapshot: ... @snapshots/8/snapshot | single | baseline before system tweaks |
+```
+
+Uwaga: GRUB pokazuje snapshoty root. Snapshoty `/home` nie są bootowalne i nie będą w menu GRUB.
 
 ---
 
-# 24. Wymuszenie polskiego układu klawiatury dla GUI
+## 22. Ukrywanie niechcianych wpisów w menu KDE
 
-Jeśli chcesz dodatkowo ustawić układ X11/GUI na polski:
+Po instalacji w menu mogą pojawić się m.in.:
 
-```
-sudo localectl --no-convert set-x11-keymap pl
-```
+- Emoji Selector
+- Avahi Zeroconf Browser
+- Qt / V4L2 tools
 
----
+Nie usuwać pakietów, jeśli są zależnościami. Sprawdzenie:
 
-# 25. Po instalacji: fix DPTF throttling z zewnętrznymi monitorami
+```bash
+pacman -Qo /usr/share/applications/*avahi* 2>/dev/null
+pacman -Qo /usr/share/applications/*qt* 2>/dev/null
+pacman -Qo /usr/share/applications/*qv4l* 2>/dev/null
+pacman -Qo /usr/share/applications/*emoji* 2>/dev/null
 
-Dell Latitude 5421 ma problem z DPTF (Dynamic Platform and Thermal Framework) — po podłączeniu zewnętrznych monitorów przez USB-C/Thunderbolt, BIOS nadmiernie dławi CPU do 200 MHz, mimo że temperatura jest normalna. Problem nasila się po hibernacji.
-
-DPTF to system Intela wbudowany w BIOS Della, który monitoruje łączny pobór mocy (CPU + GPU + porty USB-C + monitory). Kiedy uzna, że pobór jest za wysoki, ścina procesor do minimum. Na Linuksie nie ma dedykowanych sterowników Dell Thermal Framework, więc DPTF działa z agresywnymi domyślnymi progami z BIOS-u.
-
-Rozwiązanie: odpinamy sterownik `proc_thermal` automatycznie po każdym wybudzeniu z hibernacji/suspend.
-
-```
-sudo tee /etc/systemd/system/fix-dptf-throttle.service << 'EOF'
-[Unit]
-Description=Unbind DPTF proc_thermal after resume
-After=hibernate.target suspend.target hybrid-sleep.target suspend-then-hibernate.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'sleep 2 && echo 0000:00:04.0 > /sys/bus/pci/drivers/proc_thermal/unbind 2>/dev/null || true'
-
-[Install]
-WantedBy=hibernate.target suspend.target hybrid-sleep.target suspend-then-hibernate.target
-EOF
-
-sudo systemctl enable fix-dptf-throttle.service
+pacman -Qi avahi qt6-tools v4l-utils plasma-workspace | grep -E 'Name|Required By|Optional For'
 ```
 
-> **Uwaga:** po odpiniu DPTF kernel i tak ma własny thermal throttling (`x86_pkg_temp`), który chroni procesor przed przegrzaniem. Warto jednak obserwować temperatury przez kilka dni (`btop` wystarczy).
+W tej instalacji:
 
-Diagnostyka — jeśli procesor znowu spadnie do 200 MHz:
-
-```
-cat /proc/cpuinfo | grep "MHz" | head -4
-```
-
-Szybki ręczny fix:
-
-```
-sudo sh -c 'echo 0000:00:04.0 > /sys/bus/pci/drivers/proc_thermal/unbind'
+```text
+avahi       -> Required By: libcups pipewire-pulse tinysparql
+qt6-tools   -> Required By: aurorae kwin plasma-workspace
+v4l-utils   -> Required By: ffmpeg
+emoji       -> plasma-desktop
 ```
 
----
+Czyli nie usuwać. Można ukryć wpisy:
 
-# 26. Po instalacji: `yay` i pakiety z AUR
-
-Do budowania pakietów z AUR potrzebujesz `yay`. Do jednorazowej instalacji najprościej użyć `/tmp`:
-
-```
-cd /tmp
-git clone https://aur.archlinux.org/yay.git
-cd yay
-makepkg -si
-```
-
-Potem zainstaluj pakiety z AUR jednym poleceniem:
-
-```
-yay -S brave-bin brother-dcp-b7520dw brscan4 brscan-skey xpadneo-dkms plymouth-theme-arch-breeze-git
-```
-
-Opcjonalnie możesz później utworzyć własny katalog, na przykład `~/.gc`, jeśli chcesz trzymać tam klony z GitHuba, PKGBUILD-y z AUR czy własne skrypty:
-
-```
-mkdir -p ~/.gc
-```
-
----
-
-# 27. Po instalacji: konfiguracja urządzeń i aplikacji
-
-## Drukarka i skaner Brother DCP-B7520DW
-
-Adres IP drukarki/skanera w sieci lokalnej jest stały: `192.168.1.100`.
-
-Dodaj urządzenie do konfiguracji `brscan4`:
-
-```
-sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
-scanimage -L
-```
-
-Jeśli `scanimage -L` pokaże urządzenie, skanowanie jest gotowe.
-
-## Brave: trwałe obejście wolnego startu na KDE
-
-Jeśli Brave uruchamia się bardzo długo na KDE Plasma, ustaw go na stałe z flagą `--password-store=basic`.
-
-Najpierw utwórz lokalny wpis `.desktop`:
-
-```
+```bash
 mkdir -p ~/.local/share/applications
-cp /usr/share/applications/brave-browser.desktop ~/.local/share/applications/
+
+for f in \
+  /usr/share/applications/avahi-discover.desktop \
+  /usr/share/applications/qv4l2.desktop \
+  /usr/share/applications/org.kde.plasma.emojier.desktop
+do
+  cp "$f" ~/.local/share/applications/
+  grep -q '^NoDisplay=true' ~/.local/share/applications/"$(basename "$f")" || \
+    echo 'NoDisplay=true' >> ~/.local/share/applications/"$(basename "$f")"
+done
+
+kbuildsycoca6
+systemctl --user restart plasma-plasmashell.service
 ```
 
-Potem podmień linię `Exec=`:
+Przywrócenie:
 
+```bash
+rm ~/.local/share/applications/avahi-discover.desktop
+rm ~/.local/share/applications/qv4l2.desktop
+rm ~/.local/share/applications/org.kde.plasma.emojier.desktop
+kbuildsycoca6
 ```
-sed -i 's|^Exec=.*|Exec=brave --password-store=basic %U|' ~/.local/share/applications/brave-browser.desktop
-update-desktop-database ~/.local/share/applications 2>/dev/null || true
-```
-
-Od tej chwili Brave uruchamiany z menu aplikacji będzie używał `--password-store=basic`.
-
-## iPhone: parowanie i dostęp do plików
-
-Podłącz iPhone'a kablem USB, odblokuj ekran i sparuj urządzenie:
-
-```
-idevicepair pair
-```
-
-Na iPhonie powinno wyskoczyć „Ufać temu komputerowi?" — kliknij „Ufaj" i wpisz kod. Potem potwierdź parowanie:
-
-```
-idevicepair pair
-idevicepair validate
-```
-
-Oba powinny zwrócić `SUCCESS`. Po sparowaniu iPhone pojawi się w panelu bocznym Dolphina.
-
-> **Uwaga:** jeśli Dolphin pokazuje błąd `Unhandled lockdownd code '-5'` (błąd SSL), wyczyść stare rekordy parowania i sparuj ponownie:
->
-> ```
-> sudo rm -rf /var/lib/lockdown/*
-> sudo systemctl restart usbmuxd
-> ```
->
-> Odłącz i podłącz iPhone'a, odblokuj ekran, potem `idevicepair pair`.
-> Jeśli to nie pomoże, zainstaluj wersję deweloperską z AUR:
->
-> ```
-> yay -S libimobiledevice-git
-> sudo systemctl restart usbmuxd
-> ```
-
-Alternatywnie możesz zamontować iPhone'a z terminala:
-
-```
-mkdir -p ~/iPhone
-ifuse ~/iPhone
-```
-
-Zdjęcia będą w `~/iPhone/DCIM`. Żeby odmontować:
-
-```
-fusermount -u ~/iPhone
-```
-
-## Bluetooth: AirPods Pro i sterowanie mediami
-
-Żeby działało sterowanie mediami z przycisków słuchawek Bluetooth, uruchom usługę użytkownika:
-
-```
-systemctl --user enable --now mpris-proxy.service
-```
-
-Jeśli po tym sterowanie dalej nie działa, sprawdź MPRIS ręcznie:
-
-```
-playerctl -l
-playerctl play-pause
-```
-
-## Bluetooth: Xbox pad
-
-Po instalacji `xpadneo-dkms` najlepiej zrestartować system.
-
-## Motyw Plymouth
-
-Ustawienie motywu Plymouth na Arch + Breeze:
-
-```
-sudo plymouth-set-default-theme -R arch-breeze
-```
-
-Gdybyś kiedyś chciał wrócić do zwykłego Breeze:
-
-```
-sudo pacman -S breeze-plymouth
-sudo plymouth-set-default-theme -R breeze
-```
-
-## Aktualizacje firmware
-
-Sprawdź dostępne aktualizacje firmware dla laptopa:
-
-```
-fwupdmgr refresh
-fwupdmgr get-updates
-```
-
-Jeśli są dostępne, zainstaluj je:
-
-```
-fwupdmgr update
-```
-
-Dell Latitude 5421 jest dobrze wspierany przez LVFS — aktualizacje BIOS/UEFI, Thunderbolt i NVMe mogą być stosowane bezpośrednio z Linuksa.
 
 ---
 
-# 28. Stan końcowy systemu
+## 23. Typowe komendy po instalacji
 
-Po wykonaniu wszystkich kroków system ma:
+Ręczny snapshot przed zmianami:
 
-* Arch Linux
-* Btrfs
-* snapshoty przez Snapper dla `/` i `/home`
-* automatyczne snapshoty pacmana przez `snap-pac`
-* GRUB z menu snapshotów dzięki `grub-btrfs`
-* działającą hibernację
-* pełne KDE Plasma przez `plasma-meta`
-* Plasma Login Manager
-* hostname `arch`
-* `en_US.UTF-8`
-* polską klawiaturę
-* strefę `Europe/Warsaw`
-* `neovim`
-* `bash-completion`
-* `wget`, `git`, `curl`, `btop`, `fastfetch`
-* `yay`
-* kodeki multimedialne (GStreamer, FFmpeg, libdvdcss)
-* obsługę archiwów (zip, unzip, unrar, p7zip)
-* obsługę systemów plików exFAT, FAT32 (NTFS przez kernelowy `ntfs3`)
-* obsługę iPhone'a (libimobiledevice, ifuse, gvfs-afc)
-* VPN (OpenVPN + WireGuard)
-* firewall (firewalld)
-* aktualizacje firmware (fwupd)
-* TRIM dla SSD (fstrim.timer)
-* fix DPTF throttling dla zewnętrznych monitorów
-* fonty (Noto, Noto Emoji, Liberation, DejaVu)
-* narzędzia systemowe (xdg-utils, usbutils, lsof, net-tools, smartmontools, traceroute)
-* obsługę drukarki i skanera Brother DCP-B7520DW
-* Firefox
-* Thunderbird
-* Brave
-* Bluetooth w KDE
-* wsparcie dla AirPods Pro
-* `mpris-proxy.service` dla sterowania mediami po Bluetooth
-* `xpadneo-dkms` dla pada Xbox po Bluetooth
-* ładny motyw GRUB-a (Breeze)
-* splash screen Plymouth (Arch + Breeze)
-* motyw startowy pasujący do ciemnego KDE Plasma
+```bash
+sudo snapper -c root create --description "before XYZ"
+sudo snapper -c home create --description "home before XYZ"
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
 
-Dodatkowo rollback `/home` nie będzie ruszał:
+Lista snapshotów:
 
-* Firefoksa
-* Brave
-* Thunderbirda
-* kluczy GPG
-* kluczy SSH
+```bash
+sudo snapper -c root list
+sudo snapper -c home list
+```
 
-bo te katalogi mają własne subvolume poza snapshotami `@home`.
+Oznaczenie ważnego snapshotu:
+
+```bash
+sudo snapper -c root modify --cleanup-algorithm important NUMER
+sudo snapper -c home modify --cleanup-algorithm important NUMER
+```
+
+Aktualizacja GRUB po snapshotach:
+
+```bash
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Sprawdzenie hibernacji:
+
+```bash
+cat /sys/power/state
+systemctl hibernate
+```
+
+Sprawdzenie TPM/LUKS:
+
+```bash
+sudo systemd-cryptenroll /dev/nvme0n1p2
+```
+
+Sprawdzenie kernel params:
+
+```bash
+cat /proc/cmdline
+```
+
+---
+
+## 24. Rzeczy, które wyszły w trakcie i są ważne
+
+1. `plasma-login-manager` nie daje usługi `plasma-login-manager.service`, tylko:
+
+```text
+plasmalogin.service
+```
+
+2. Nie instalować `sddm`, jeśli celem jest Plasma Login Manager.
+
+3. Nie instalować `nano` ani `vim`, jeśli używany ma być tylko `neovim`.
+
+4. `fwupd` nie jest wymagane do działania firmware. Do firmware wystarczy `linux-firmware`.
+
+5. `linux-firmware` jest właściwym pakietem firmware w Archu. Nie trzeba osobno dodawać `linux-firmware-intel` i `linux-firmware-realtek`, jeśli używany jest meta-pakiet `linux-firmware`.
+
+6. `avahi`, `qt6-tools`, `v4l-utils` i emoji selector wyglądają jak śmieci w menu, ale są zależnościami. Nie usuwać na ślepo.
+
+7. W chroot Snapper robi błędy DBus. Używać:
+
+```bash
+snapper --no-dbus ...
+```
+
+8. Jeśli `/mnt/swap` jest busy przy odmontowaniu, to aktywny jest swapfile. Najpierw:
+
+```bash
+swapoff /mnt/swap/swapfile 2>/dev/null || swapoff -a
+```
+
+9. `grub-btrfs` wykrywa tylko snapshoty root. Snapshoty home nie będą w GRUB.
+
+10. `os-prober` warning w GRUB jest normalny bez dual-boota.
+
+11. Warning `qat_6xxx` przy `mkinitcpio` można zignorować na tym laptopie.
+
+12. Swapfile na Btrfs wymaga `NOCOW`. Jeśli `btrfs filesystem mkswapfile` nie działa, użyć manualnej metody z `touch`, `chattr +C`, `dd`, `mkswap`.
+
+---
+
+## 25. Aktualizacja istniejącego repo
+
+Obecna instrukcja w repo:
+
+```text
+https://github.com/pietryszak/arch
+```
+
+jest nieaktualna. Ten plik może zastąpić obecny `README.md` albo wejść jako:
+
+```text
+README.md
+docs/arch-btrfs-luks-tpm-snapper.md
+```
+
+Proponowana nazwa:
+
+```text
+README.md
+```
