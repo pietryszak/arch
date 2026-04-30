@@ -360,11 +360,6 @@ echo "RESUME_OFFSET=$RESUME_OFFSET"
 
 W tej instalacji było:
 
-```text
-CRYPT_UUID=bc4080e7-6014-4803-ae83-b86f8377bced
-ROOT_UUID=572457ed-c62c-4a3f-8d14-891559bd3ea2
-RESUME_OFFSET=1549568
-```
 
 `/etc/crypttab.initramfs`:
 
