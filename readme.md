@@ -407,7 +407,7 @@ Sprawdzenie:
 systemd-cryptenroll /dev/nvme0n1p2
 ```
 
-Po enrolowaniu:
+Po poprawnym dodaniu TPM2 tokena, czyli gdy `systemd-cryptenroll /dev/nvme0n1p2` pokazuje slot `tpm2`, przebuduj initramfs i GRUB:
 
 ```bash
 mkinitcpio -P
