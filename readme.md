@@ -319,13 +319,6 @@ grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults
 swapon --show
 ```
 
-Oczekiwane:
-
-```text
-NAME           TYPE SIZE USED PRIO
-/swap/swapfile file  40G   0B   -1
-```
-
 Offset do hibernacji:
 
 ```bash
