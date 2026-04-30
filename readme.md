@@ -185,9 +185,6 @@ EOF
 
 ## 6. Minimalny pacstrap
 
-Finalna użyta idea: minimum KDE, ale używalne — z terminalem i menedżerem plików.  
-Bez `sddm`, bez `nano`, bez `vim`, bez `fwupd`, bez Flatpak.
-
 ```bash
 pacstrap -K /mnt \
   base linux linux-headers linux-firmware \
@@ -208,17 +205,6 @@ pacstrap -K /mnt \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin
 ```
-
-Uwagi:
-
-- `plasma-login-manager` daje usługę `plasmalogin.service`.
-- Nie instalować `sddm`.
-- `qt6-tools`, `avahi`, `v4l-utils`, `emoji selector` mogą potem pojawić się w menu jako „śmieci”, ale są zależnościami ważnych komponentów:
-  - `avahi` wymagane m.in. przez `pipewire-pulse`
-  - `qt6-tools` wymagane przez `kwin` i `plasma-workspace`
-  - `v4l-utils` wymagane przez `ffmpeg`
-  - emoji selector jest częścią `plasma-desktop`
-- Tych pakietów nie usuwać. Ewentualnie ukryć wpisy `.desktop`.
 
 ---
 
