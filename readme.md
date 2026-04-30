@@ -293,22 +293,6 @@ Bez `compress=zstd:3`.
 
 ## 10. Swapfile pod hibernację — ważna poprawiona metoda
 
-W trakcie instalacji wyszło, że `btrfs filesystem mkswapfile` może wywalić:
-
-```text
-ERROR: cannot set NOCOW flag: Invalid argument
-```
-
-U nas dodatkowo problem pojawił się po ustawieniu:
-
-```bash
-btrfs property set /swap compression none
-```
-
-To ustawiło atrybut `m` i blokowało `chattr +C`.
-
-Finalna poprawiona metoda:
-
 ```bash
 swapoff -a 2>/dev/null || true
 rm -f /swap/swapfile
