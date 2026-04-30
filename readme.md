@@ -442,14 +442,6 @@ plasmalogin.service
 
 ## 16. Snapper root — poprawiona metoda z `--no-dbus`
 
-W chroot Snapper bez `--no-dbus` wywalał:
-
-```text
-Failure (org.freedesktop.DBus.Error.ServiceUnknown)
-```
-
-Dlatego w chroot używać `snapper --no-dbus`.
-
 Root:
 
 ```bash
