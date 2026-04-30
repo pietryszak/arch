@@ -358,11 +358,6 @@ echo "ROOT_UUID=$ROOT_UUID"
 echo "RESUME_OFFSET=$RESUME_OFFSET"
 ```
 
-W tej instalacji było:
-
-
-`/etc/crypttab.initramfs`:
-
 ```bash
 cat > /etc/crypttab.initramfs <<EOF
 cryptroot UUID=${CRYPT_UUID} none tpm2-device=auto
@@ -400,12 +395,6 @@ Sprawdzenie TPM:
 systemd-cryptenroll --tpm2-device=list
 ```
 
-W tej instalacji:
-
-```text
-/dev/tpmrm0 STM0125:00 tpm_tis
-```
-
 Dodanie TPM2 + PIN:
 
 ```bash
@@ -418,35 +407,12 @@ Sprawdzenie:
 systemd-cryptenroll /dev/nvme0n1p2
 ```
 
-Oczekiwane:
-
-```text
-SLOT TYPE
-   0 password
-   1 tpm2
-```
-
 Po enrolowaniu:
 
 ```bash
 mkinitcpio -P
 grub-mkconfig -o /boot/grub/grub.cfg
 ```
-
-### Opcjonalnie: TPM bez PIN
-
-Da się, ale jest mniej bezpieczne.  
-Zmiana po instalacji:
-
-```bash
-sudo systemd-cryptenroll /dev/nvme0n1p2 --wipe-slot=tpm2
-sudo systemd-cryptenroll /dev/nvme0n1p2 --tpm2-device=auto
-sudo systemd-cryptenroll /dev/nvme0n1p2
-sudo mkinitcpio -P
-sudo grub-mkconfig -o /boot/grub/grub.cfg
-```
-
-Rekomendacja: na laptopie zostawić TPM2 + PIN.
 
 ---
 
