@@ -170,9 +170,10 @@ findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
 
 ## 6. Minimalny pacstrap
 
-```bash
-findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
+# Wymagane przed pacstrap, bo instalacja kernela odpala mkinitcpio,
+# a hook sd-vconsole/keymap szuka /etc/vconsole.conf w instalowanym systemie.
 
+```bash
 mkdir -p /mnt/etc
 
 cat > /mnt/etc/vconsole.conf <<'EOF'
@@ -192,7 +193,7 @@ pacstrap -K /mnt \
   bluez bluez-utils \
   sof-firmware alsa-utils \
   mesa vulkan-intel intel-media-driver \
-  snapper snap-pac grub-btrfs \
+  snapper grub-btrfs \
   plasma-desktop plasma-login-manager \
   plasma-nm plasma-pa powerdevil bluedevil kscreen \
   xdg-desktop-portal-kde \
