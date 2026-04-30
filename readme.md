@@ -1,93 +1,8 @@
 # Arch Linux na Dell Latitude 5421 — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
 
-Instrukcja powstała po faktycznej instalacji i zawiera poprawki błędów, które wyszły w trakcie.  
-Docelowy system:
-
-- Arch Linux
-- UEFI
-- LUKS2 na root
-- TPM2 + PIN do odblokowania LUKS
-- Btrfs z subvolumami
-- Snapper dla `/` i `/home`
-- `grub-btrfs` z bootowalnymi snapshotami w GRUB
-- hibernacja na Btrfs swapfile
-- minimalne KDE Plasma
-- Plasma Login Manager, czyli `plasmalogin`, bez SDDM
-- NetworkManager, Bluetooth, PipeWire/WirePlumber
-- bez `nano`, bez `vim`, używany `neovim`
-- bez `fwupd`, bez Flatpak, bez pełnego KDE Gear
-
----
-
-## 0. Założenia
-
-Dysk:
-
-```bash
-/dev/nvme0n1
-```
-
-Partycje:
-
-```text
-/dev/nvme0n1p1    EFI        1G      FAT32
-/dev/nvme0n1p2    cryptroot  reszta  LUKS2
-```
-
-W środku LUKS:
-
-```text
-/dev/mapper/cryptroot  Btrfs
-```
-
-Hostname:
-
-```text
-arch
-```
-
-Użytkownik:
-
-```text
-pietryszak
-```
-
-Subvolumy Btrfs:
-
-```text
-@                  /
-@home              /home
-@snapshots         /.snapshots
-@home_snapshots    /home/.snapshots
-@log               /var/log
-@cache             /var/cache
-@pkg               /var/cache/pacman/pkg
-@tmp               /var/tmp
-@spool             /var/spool
-@opt               /opt
-@swap              /swap
-@libvirt           /var/lib/libvirt
-@mozilla           /home/pietryszak/.mozilla
-@brave             /home/pietryszak/.config/BraveSoftware
-@thunderbird       /home/pietryszak/.thunderbird
-@ssh               /home/pietryszak/.ssh
-@gnupg             /home/pietryszak/.gnupg
-```
-
 ---
 
 ## 1. Start z Arch ISO
-
-```bash
-loadkeys pl
-timedatectl set-ntp true
-```
-
-Sprawdzenie UEFI:
-
-```bash
-ls /sys/firmware/efi/efivars
-```
 
 Połączenie Wi-Fi z live ISO:
 
@@ -111,6 +26,25 @@ Test:
 ping -c 3 archlinux.org
 ```
 
+```bash
+loadkeys pl
+timedatectl set-ntp true
+```
+
+Na live ISO ustaw hasło roota i uruchom SSH:
+
+```bash
+passwd
+systemctl start sshd
+ip -br a
+```
+
+Z drugiego komputera połącz się tak:
+
+```bash
+ssh root@ADRES_IP
+Reszta komend przez ssh.
+```
 ---
 
 ## 2. Partycjonowanie
