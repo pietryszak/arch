@@ -28,11 +28,17 @@ ping -c 3 archlinux.org
 loadkeys pl
 timedatectl set-ntp true
 ```
-Ssh:
+
+Na live ISO ustaw hasło roota i uruchom SSH:
 ```bash
-systemctl start sshd
 passwd
-ip a
+systemctl start sshd
+ip -br a
+```
+
+Z drugiego komputera połącz się tak:
+```bash
+ssh root@ADRES_IP
 ```
 Reszta komend przez ssh.
 
