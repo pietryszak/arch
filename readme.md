@@ -28,14 +28,13 @@ ping -c 3 archlinux.org
 loadkeys pl
 timedatectl set-ntp true
 ```
-
-Sprawdzenie UEFI:
-
+Ssh:
 ```bash
-ls /sys/firmware/efi/efivars
+systemctl start sshd
+passwd
+ip a
 ```
-
----
+Reszta komend przez ssh.
 
 ## 2. Partycjonowanie
 
