@@ -203,7 +203,7 @@ pacstrap -K /mnt \
   xdg-desktop-portal-kde \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
-  konsole dolphin
+  konsole dolphin bash-completion
 ```
 
 ---
