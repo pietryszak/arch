@@ -171,6 +171,16 @@ findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
 ## 6. Minimalny pacstrap
 
 ```bash
+findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
+
+mkdir -p /mnt/etc
+
+cat > /mnt/etc/vconsole.conf <<'EOF'
+KEYMAP=pl
+EOF
+```
+
+```bash
 pacstrap -K /mnt \
   base linux linux-headers linux-firmware \
   intel-ucode \
