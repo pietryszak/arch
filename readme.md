@@ -928,25 +928,527 @@ swapoff /mnt/swap/swapfile 2>/dev/null || swapoff -a
 
 12. Swapfile na Btrfs wymaga `NOCOW`. Jeśli `btrfs filesystem mkswapfile` nie działa, użyć manualnej metody z `touch`, `chattr +C`, `dd`, `mkswap`.
 
+
 ---
 
-## 25. Aktualizacja istniejącego repo
+# 25. Po instalacji — dodatkowa konfiguracja z poprzedniego README, poprawiona pod aktualny minimalny system
 
-Obecna instrukcja w repo:
+Poprzednia instrukcja miała dużo kroków „po czystym systemie”: Plymouth, AUR, Brave, Brother, iPhone, AirPods, Xbox pad, DPTF throttling, firmware, firewall, narzędzia itd.  
+Nie wrzucamy tego wszystkiego do `pacstrap`, bo obecny cel to minimalny system. Te rzeczy instalujesz dopiero po pierwszym poprawnym uruchomieniu, najlepiej z ręcznymi snapshotami przed większymi zmianami.
 
-```text
-https://github.com/pietryszak/arch
+Przed większym blokiem zmian:
+
+```bash
+sudo snapper -c root create --description "before post-install tweaks"
+sudo snapper -c home create --description "home before post-install tweaks"
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
-jest nieaktualna. Ten plik może zastąpić obecny `README.md` albo wejść jako:
+---
 
-```text
-README.md
-docs/arch-btrfs-luks-tpm-snapper.md
+## 25.1 Pakiety bazowe po instalacji, opcjonalne
+
+Jeśli chcesz wrócić do wygody ze starego README, ale bez pełnego `plasma-meta`, możesz doinstalować tylko potrzebne rzeczy:
+
+```bash
+sudo pacman -S --needed \
+  bash-completion btop fastfetch openssh playerctl \
+  zip unzip unrar p7zip \
+  exfatprogs dosfstools mtools \
+  usbutils lsof net-tools smartmontools traceroute \
+  wireguard-tools networkmanager-openvpn \
+  firewalld
 ```
 
-Proponowana nazwa:
+Włączenie usług, jeśli ich używasz:
+
+```bash
+sudo systemctl enable --now sshd
+sudo systemctl enable --now firewalld
+sudo systemctl enable --now fstrim.timer
+```
+
+`fstrim.timer` warto mieć na SSD/NVMe.
+
+---
+
+## 25.2 Kodeki multimedialne
+
+Minimalny system ma `ffmpeg` jako zależność części KDE/multimediów, ale jeśli chcesz pełniejsze kodeki:
+
+```bash
+sudo pacman -S --needed \
+  ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
+```
+
+`libdvdcss` instaluj tylko jeśli faktycznie potrzebujesz odtwarzania szyfrowanych DVD:
+
+```bash
+sudo pacman -S --needed libdvdcss
+```
+
+---
+
+## 25.3 Firefox, Thunderbird, Brave
+
+Firefox i Thunderbird z repo:
+
+```bash
+sudo pacman -S --needed firefox thunderbird
+```
+
+Brave z AUR, więc najpierw `yay`.
+
+---
+
+## 25.4 `base-devel` i `yay`
+
+Do AUR potrzebujesz `base-devel`.
+
+```bash
+sudo pacman -S --needed base-devel
+```
+
+Instalacja `yay`:
+
+```bash
+cd /tmp
+git clone https://aur.archlinux.org/yay.git
+cd yay
+makepkg -si
+```
+
+Opcjonalny katalog na klony/AUR/własne rzeczy:
+
+```bash
+mkdir -p ~/.gc
+```
+
+Pakiety AUR ze starego README, jeśli nadal ich chcesz:
+
+```bash
+yay -S brave-bin brother-dcp-b7520dw brscan4 brscan-skey xpadneo-dkms plymouth-theme-arch-breeze-git
+```
+
+Uwaga: `xpadneo-dkms` wymaga `dkms` i nagłówków kernela. `linux-headers` już był w bazowej instalacji, ale jeśli go nie masz:
+
+```bash
+sudo pacman -S --needed linux-headers dkms
+```
+
+Po instalacji `xpadneo-dkms` najlepiej zrobić restart.
+
+---
+
+## 25.5 Plymouth i splash screen
+
+W bazowej instalacji celowo nie było Plymouth, bo minimalny system i hibernacja/LUKS/TPM powinny najpierw działać bez upiększeń.
+
+Instalacja Plymouth:
+
+```bash
+sudo pacman -S --needed plymouth plymouth-kcm
+```
+
+Jeśli używasz motywu z AUR:
+
+```bash
+yay -S plymouth-theme-arch-breeze-git
+```
+
+Ustawienie motywu:
+
+```bash
+sudo plymouth-set-default-theme -R arch-breeze
+```
+
+Powrót do zwykłego Breeze:
+
+```bash
+sudo pacman -S --needed breeze-plymouth
+sudo plymouth-set-default-theme -R breeze
+```
+
+Dodanie `splash` do GRUB:
+
+```bash
+sudo sed -i 's/\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 splash"/' /etc/default/grub
+sudo sed -i 's/  */ /g' /etc/default/grub
+```
+
+Dodanie hooka `plymouth` do `mkinitcpio` przy obecnym układzie `systemd + sd-encrypt`:
+
+```bash
+sudo sed -i 's/\<sd-vconsole\>/sd-vconsole plymouth/' /etc/mkinitcpio.conf
+sudo sed -i 's/\(plymouth \)\+/plymouth /g' /etc/mkinitcpio.conf
+grep '^HOOKS=' /etc/mkinitcpio.conf
+```
+
+Oczekiwany układ z Plymouth:
 
 ```text
-README.md
+HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole plymouth block sd-encrypt filesystems fsck)
 ```
+
+Przebudowa:
+
+```bash
+sudo mkinitcpio -P
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Uwaga: przy LUKS + TPM2 PIN najpierw upewnij się, że zwykły boot i hibernacja działają. Plymouth dodawaj dopiero później.
+
+---
+
+## 25.6 Motyw GRUB Breeze
+
+Jeśli chcesz motyw GRUB Breeze:
+
+```bash
+sudo pacman -S --needed breeze-grub
+```
+
+Ustawienie:
+
+```bash
+grep -q '^GRUB_THEME=' /etc/default/grub \
+  && sudo sed -i 's|^GRUB_THEME=.*|GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"|' /etc/default/grub \
+  || echo 'GRUB_THEME="/usr/share/grub/themes/breeze/theme.txt"' | sudo tee -a /etc/default/grub
+
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+---
+
+## 25.7 Wymuszenie polskiego układu klawiatury dla GUI
+
+Systemowo masz `KEYMAP=pl`, ale dla GUI/Plasma możesz dodatkowo ustawić:
+
+```bash
+sudo localectl --no-convert set-x11-keymap pl
+```
+
+Sprawdzenie:
+
+```bash
+localectl status
+```
+
+---
+
+## 25.8 Dell Latitude 5421 — fix DPTF throttling po hibernacji / monitorach USB-C
+
+Stare README miało fix na przypadek, gdy Dell Latitude 5421 po zewnętrznych monitorach USB-C/Thunderbolt lub po hibernacji dławi CPU do około 200 MHz.
+
+Utwórz usługę:
+
+```bash
+sudo tee /etc/systemd/system/fix-dptf-throttle.service << 'EOF'
+[Unit]
+Description=Unbind DPTF proc_thermal after resume
+After=hibernate.target suspend.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'sleep 2 && echo 0000:00:04.0 > /sys/bus/pci/drivers/proc_thermal/unbind 2>/dev/null || true'
+
+[Install]
+WantedBy=hibernate.target suspend.target hybrid-sleep.target suspend-then-hibernate.target
+EOF
+
+sudo systemctl enable fix-dptf-throttle.service
+```
+
+Diagnostyka, gdy CPU znowu spada do bardzo niskich taktowań:
+
+```bash
+cat /proc/cpuinfo | grep "MHz" | head -4
+```
+
+Ręczny fix:
+
+```bash
+sudo sh -c 'echo 0000:00:04.0 > /sys/bus/pci/drivers/proc_thermal/unbind'
+```
+
+Uwaga: po odpięciu DPTF kernel nadal ma własne zabezpieczenia termiczne, ale po tej zmianie warto obserwować temperatury przez kilka dni, np. w `btop`.
+
+---
+
+## 25.9 Drukarka i skaner Brother DCP-B7520DW
+
+Jeżeli chcesz obsługę drukarki/skanera Brother ze starego README, doinstaluj:
+
+```bash
+sudo pacman -S --needed cups system-config-printer sane simple-scan avahi nss-mdns
+sudo systemctl enable --now cups.service
+sudo systemctl enable --now avahi-daemon.service
+```
+
+Pakiety Brother z AUR:
+
+```bash
+yay -S brother-dcp-b7520dw brscan4 brscan-skey
+```
+
+Konfiguracja skanera po IP:
+
+```bash
+sudo brsaneconfig4 -a name=Brother model=DCP-B7520DW ip=192.168.1.100
+scanimage -L
+```
+
+Jeśli `scanimage -L` pokazuje urządzenie, skanowanie jest gotowe.
+
+---
+
+## 25.10 Brave — obejście wolnego startu na KDE
+
+Jeśli Brave uruchamia się długo przez integrację z portfelem/secret service, możesz ustawić `--password-store=basic`.
+
+```bash
+mkdir -p ~/.local/share/applications
+cp /usr/share/applications/brave-browser.desktop ~/.local/share/applications/
+
+sed -i 's|^Exec=.*|Exec=brave --password-store=basic %U|' ~/.local/share/applications/brave-browser.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+kbuildsycoca6
+```
+
+Od tej chwili Brave z menu aplikacji użyje `--password-store=basic`.
+
+---
+
+## 25.11 iPhone — parowanie i dostęp do plików
+
+Pakiety:
+
+```bash
+sudo pacman -S --needed gvfs gvfs-afc gvfs-gphoto2 libimobiledevice usbmuxd ifuse
+```
+
+Podłącz iPhone'a kablem, odblokuj ekran i wykonaj:
+
+```bash
+idevicepair pair
+idevicepair validate
+```
+
+Na iPhonie potwierdź „Ufaj temu komputerowi”.
+
+Jeśli Dolphin pokazuje błąd `Unhandled lockdownd code '-5'`:
+
+```bash
+sudo rm -rf /var/lib/lockdown/*
+sudo systemctl restart usbmuxd
+```
+
+Odłącz/podłącz iPhone'a, odblokuj ekran i ponów:
+
+```bash
+idevicepair pair
+idevicepair validate
+```
+
+Montaż ręczny:
+
+```bash
+mkdir -p ~/iPhone
+ifuse ~/iPhone
+```
+
+Zdjęcia:
+
+```text
+~/iPhone/DCIM
+```
+
+Odmontowanie:
+
+```bash
+fusermount -u ~/iPhone
+```
+
+---
+
+## 25.12 Bluetooth — AirPods Pro i sterowanie mediami
+
+Do sterowania mediami z przycisków słuchawek Bluetooth:
+
+```bash
+systemctl --user enable --now mpris-proxy.service
+```
+
+Test MPRIS:
+
+```bash
+playerctl -l
+playerctl play-pause
+```
+
+Jeśli nie masz `playerctl`:
+
+```bash
+sudo pacman -S --needed playerctl
+```
+
+---
+
+## 25.13 Bluetooth — Xbox pad
+
+Pakiet z AUR:
+
+```bash
+yay -S xpadneo-dkms
+```
+
+Po instalacji:
+
+```bash
+sudo reboot
+```
+
+---
+
+## 25.14 Aktualizacje firmware Dell / LVFS
+
+W bazowym minimalnym systemie `fwupd` nie był instalowany. Jeśli chcesz aktualizacje BIOS/UEFI/Thunderbolt/NVMe przez LVFS:
+
+```bash
+sudo pacman -S --needed fwupd
+sudo systemctl enable --now fwupd-refresh.timer
+```
+
+Sprawdzenie:
+
+```bash
+fwupdmgr refresh
+fwupdmgr get-updates
+```
+
+Aktualizacja:
+
+```bash
+fwupdmgr update
+```
+
+---
+
+## 25.15 Ukrywanie niechcianych wpisów w menu KDE
+
+Nie usuwać pakietów typu `avahi`, `qt6-tools`, `v4l-utils`, jeśli są zależnościami. Lepiej ukryć wpisy `.desktop`.
+
+Sprawdzenie właścicieli:
+
+```bash
+pacman -Qo /usr/share/applications/*avahi* 2>/dev/null
+pacman -Qo /usr/share/applications/*qt* 2>/dev/null
+pacman -Qo /usr/share/applications/*qv4l* 2>/dev/null
+pacman -Qo /usr/share/applications/*emoji* 2>/dev/null
+```
+
+Sprawdzenie zależności:
+
+```bash
+pacman -Qi avahi qt6-tools v4l-utils plasma-workspace | grep -E 'Name|Required By|Optional For'
+```
+
+Ukrycie Avahi, qv4l2 i Emoji Selector:
+
+```bash
+mkdir -p ~/.local/share/applications
+
+for f in \
+  /usr/share/applications/avahi-discover.desktop \
+  /usr/share/applications/qv4l2.desktop \
+  /usr/share/applications/org.kde.plasma.emojier.desktop
+do
+  cp "$f" ~/.local/share/applications/
+  grep -q '^NoDisplay=true' ~/.local/share/applications/"$(basename "$f")" || \
+    echo 'NoDisplay=true' >> ~/.local/share/applications/"$(basename "$f")"
+done
+
+kbuildsycoca6
+systemctl --user restart plasma-plasmashell.service
+```
+
+Przywrócenie:
+
+```bash
+rm ~/.local/share/applications/avahi-discover.desktop
+rm ~/.local/share/applications/qv4l2.desktop
+rm ~/.local/share/applications/org.kde.plasma.emojier.desktop
+kbuildsycoca6
+```
+
+---
+
+## 25.16 Snapshot po post-install
+
+Po większych zmianach po instalacji:
+
+```bash
+sudo snapper -c root create --description "after post-install tweaks"
+sudo snapper -c home create --description "home after post-install tweaks"
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+Jeśli snapshot ma zostać na dłużej, oznacz go jako important:
+
+```bash
+sudo snapper -c root list
+sudo snapper -c root modify --cleanup-algorithm important NUMER
+
+sudo snapper -c home list
+sudo snapper -c home modify --cleanup-algorithm important NUMER
+```
+
+---
+
+# 26. Stan końcowy systemu — wariant aktualny
+
+Po wykonaniu bazowej instalacji system ma:
+
+- Arch Linux
+- LUKS2 na `/dev/nvme0n1p2`
+- TPM2 + PIN
+- Btrfs na `/dev/mapper/cryptroot`
+- swapfile 40 GiB na `/swap/swapfile`
+- działające `resume_offset`
+- Snapper dla `/`
+- Snapper dla `/home`
+- `snap-pac`
+- GRUB z snapshotami przez `grub-btrfs`
+- hibernację
+- minimalne KDE Plasma
+- Plasma Login Manager przez `plasmalogin.service`
+- NetworkManager
+- Bluetooth
+- PipeWire + WirePlumber
+- hostname `arch`
+- `en_US.UTF-8`
+- polską klawiaturę
+- strefę `Europe/Warsaw`
+- `neovim`
+- `konsole`
+- `dolphin`
+- fonty Noto/Noto Emoji/DejaVu
+
+Po wykonaniu opcjonalnych kroków post-install możesz dodatkowo mieć:
+
+- Plymouth splash
+- motyw GRUB Breeze
+- `yay`
+- Brave
+- Firefox
+- Thunderbird
+- Brother DCP-B7520DW
+- obsługę iPhone'a
+- AirPods Pro MPRIS
+- Xbox pad przez `xpadneo`
+- aktualizacje firmware przez `fwupd`
+- firewall
+- kodeki
+- narzędzia diagnostyczne
+- fix DPTF throttling na Dell Latitude 5421
