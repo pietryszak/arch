@@ -248,17 +248,6 @@ LC_MONETARY=pl_PL.UTF-8
 LC_MEASUREMENT=pl_PL.UTF-8
 LC_PAPER=pl_PL.UTF-8
 EOF
-```
-
-Plik `/mnt/etc/vconsole.conf` został utworzony przed `pacstrap`, żeby `mkinitcpio` podczas instalacji kernela nie wywalał błędu o braku `/etc/vconsole.conf`.
-
-Po późniejszej zmianie `HOOKS` i tak wykonamy:
-
-```bash
-mkinitcpio -P
-```
-
-Warning o `qat_6xxx` można zignorować na Dell Latitude 5421.
 
 ---
 
