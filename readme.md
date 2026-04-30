@@ -572,6 +572,13 @@ snapper --no-dbus -c home create --description "fresh encrypted home snapshot"
 snapper --no-dbus -c home list
 ```
 
+## 17.1 Instalacja snap-pac po konfiguracji Snappera
+
+`snap-pac` instalujemy dopiero po utworzeniu konfiguracji Snappera dla `/` i `/home`.  
+Nie instalować `snap-pac` w `pacstrap`, bo jego hooki pacmana mogą uruchomić się zanim Snapper będzie gotowy.
+
+```bash
+pacman -S --needed snap-pac
 ---
 
 ## 18. Timery Snappera i grub-btrfs
