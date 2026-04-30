@@ -598,19 +598,16 @@ Po zainstalowaniu i drobnych zmianach wykonano baseline:
 sudo snapper -c root create --description "baseline before system tweaks"
 sudo snapper -c home create --description "baseline home before tweaks"
 ```
-
-W tej instalacji:
-
-```text
-root snapshot: 8
-home snapshot: 2
+```bash
+sudo snapper -c root list
+sudo snapper -c home list
 ```
 
 Oznaczenie jako important:
 
 ```bash
-sudo snapper -c root modify --cleanup-algorithm important 8
-sudo snapper -c home modify --cleanup-algorithm important 2
+sudo snapper -c root modify --cleanup-algorithm important numer
+sudo snapper -c home modify --cleanup-algorithm important numer
 ```
 
 Odświeżenie GRUB:
