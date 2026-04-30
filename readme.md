@@ -1423,25 +1423,5 @@ Po wykonaniu opcjonalnych kroków post-install możesz dodatkowo mieć:
 - narzędzia diagnostyczne
 - fix DPTF throttling na Dell Latitude 5421
 
----
 
-## 25. Aktualizacja istniejącego repo
 
-Obecna instrukcja w repo:
-
-```text
-https://github.com/pietryszak/arch
-```
-
-jest nieaktualna. Ten plik może zastąpić obecny `README.md` albo wejść jako:
-
-```text
-README.md
-docs/arch-btrfs-luks-tpm-snapper.md
-```
-
-Proponowana nazwa:
-
-```text
-README.md
-```
