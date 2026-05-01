@@ -1,5 +1,7 @@
 # Arch Linux na Dell Latitude 5421 — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
 
+**Szybki skok (sekcje 1–4):** [1 — Start z Arch ISO](#1-start-z-arch-iso) · [2 — Partycjonowanie](#2-partycjonowanie) · [3 — LUKS2](#3-luks2) · [4 — Btrfs i subvolumy](#4-btrfs-i-subvolumy)
+
 ---
 
 ## 1. Start z Arch ISO
@@ -45,6 +47,7 @@ Z drugiego komputera połącz się tak:
 ssh root@ADRES_IP
 Reszta komend przez ssh.
 ```
+
 ---
 
 ## 2. Partycjonowanie
@@ -249,6 +252,7 @@ LC_MEASUREMENT=pl_PL.UTF-8
 LC_PAPER=pl_PL.UTF-8
 EOF
 ```
+
 ---
 
 ## 8. Użytkownik i sudo
@@ -496,7 +500,6 @@ Uwaga: w `chroot` po instalacji `snap-pac` może pojawić się komunikat `fatal 
 pacman -S --needed snap-pac
 ```
 
-
 ---
 
 ## 18. Timery Snappera i grub-btrfs
@@ -598,6 +601,7 @@ Po zainstalowaniu i drobnych zmianach wykonano baseline:
 sudo snapper -c root create --description "baseline before system tweaks"
 sudo snapper -c home create --description "baseline home before tweaks"
 ```
+
 ```bash
 sudo snapper -c root list
 sudo snapper -c home list
@@ -623,5 +627,3 @@ Found snapshot: ... @snapshots/8/snapshot | single | baseline before system twea
 ```
 
 Uwaga: GRUB pokazuje snapshoty root. Snapshoty `/home` nie są bootowalne i nie będą w menu GRUB.
-
-
