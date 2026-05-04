@@ -1,4 +1,4 @@
-# Arch Linux na Dell Latitude 5421 — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
+# Arch Linux — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
 
 **Szybki skok (sekcje 1–4):** [1 — Start z Arch ISO](#1-start-z-arch-iso) · [2 — Partycjonowanie](#2-partycjonowanie) · [3 — LUKS2](#3-luks2) · [4 — Btrfs i subvolumy](#4-btrfs-i-subvolumy)
 
@@ -208,7 +208,29 @@ pacstrap -K /mnt \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin bash-completion
 ```
-
+DLA NVIDIA
+```bash
+pacstrap -K /mnt \
+  base linux linux-headers linux-firmware \
+  amd-ucode \
+  btrfs-progs cryptsetup tpm2-tools \
+  grub efibootmgr \
+  networkmanager wireless-regdb \
+  sudo neovim git curl wget man-db man-pages \
+  pipewire wireplumber pipewire-pulse pipewire-alsa \
+  bluez bluez-utils \
+  alsa-utils \
+  mesa \
+  nvidia-open nvidia-utils nvidia-settings opencl-nvidia \
+  libva-nvidia-driver \
+  snapper grub-btrfs \
+  plasma-desktop plasma-login-manager \
+  plasma-nm plasma-pa powerdevil bluedevil kscreen \
+  xdg-desktop-portal-kde \
+  breeze-gtk kde-gtk-config \
+  noto-fonts noto-fonts-emoji ttf-dejavu \
+  konsole dolphin bash-completion
+```
 ---
 
 ## 7. fstab i chroot
@@ -227,6 +249,17 @@ cat > /etc/hosts <<'EOF'
 127.0.0.1 localhost
 ::1       localhost
 127.0.1.1 arch.localdomain arch
+EOF
+```
+
+Dla NVIDIA
+```bash
+echo gigant > /etc/hostname
+
+cat > /etc/hosts <<'EOF'
+127.0.0.1 localhost
+::1       localhost
+127.0.1.1 gigant.localdomain gigant
 EOF
 ```
 
@@ -313,7 +346,7 @@ lsattr /swap/swapfile
 Tworzenie pliku 40 GiB:
 
 ```bash
-dd if=/dev/zero of=/swap/swapfile bs=1M count=40960 status=progress
+dd if=/dev/zero of=/swap/swapfile bs=1M count=40968 status=progress
 chmod 600 /swap/swapfile
 mkswap /swap/swapfile
 swapon /swap/swapfile
@@ -323,7 +356,17 @@ grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults
 swapon --show
 ```
 
-Offset do hibernacji:
+Dla NIVDIA:
+```bash
+dd if=/dev/zero of=/swap/swapfile bs=1M count=81936 status=progress
+chmod 600 /swap/swapfile
+mkswap /swap/swapfile
+swapon /swap/swapfile
+
+grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults 0 0" >> /etc/fstab
+
+swapon --show
+```
 
 ```bash
 btrfs inspect-internal map-swapfile -r /swap/swapfile
@@ -341,6 +384,14 @@ sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboar
 grep '^HOOKS=' /etc/mkinitcpio.conf
 mkinitcpio -P
 ```
+
+Dla Nvidia:
+```bash
+sed -i 's/^MODULES=.*/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/' /etc/mkinitcpio.conf
+
+grep '^HOOKS=' /etc/mkinitcpio.conf
+mkinitcpio -P
 
 Oczekiwane:
 
@@ -379,7 +430,12 @@ sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet logl
 
 grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
 ```
+Dla Nvidia:
+```bash
+sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 nvidia_drm.modeset=1 rd.luks.name=${CRYPT_UUID}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ resume=UUID=${ROOT_UUID} resume_offset=${RESUME_OFFSET}\"|" /etc/default/grub
 
+grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
+```
 Instalacja GRUB:
 
 ```bash
