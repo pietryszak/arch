@@ -99,6 +99,8 @@ mount /dev/mapper/cryptroot /mnt
 
 Tworzenie subvolumów:
 
+Osobne subvolumy pod profile aplikacji (bind-mounty ustawiasz później we własnym zakresie): **`@mozilla`** — Firefox (`~/.mozilla`), **`@vivaldi`** — stabilny Vivaldi (`~/.config/vivaldi`), **`@vivaldi-snapshot`** — Vivaldi Snapshot z AUR (`~/.config/vivaldi-snapshot`).
+
 ```bash
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
@@ -114,6 +116,7 @@ btrfs subvolume create /mnt/@swap
 btrfs subvolume create /mnt/@libvirt
 btrfs subvolume create /mnt/@mozilla
 btrfs subvolume create /mnt/@vivaldi
+btrfs subvolume create /mnt/@vivaldi-snapshot
 btrfs subvolume create /mnt/@thunderbird
 btrfs subvolume create /mnt/@ssh
 btrfs subvolume create /mnt/@gnupg
