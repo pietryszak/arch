@@ -45,8 +45,9 @@ Z drugiego komputera połącz się tak:
 
 ```bash
 ssh root@ADRES_IP
-Reszta komend przez ssh.
 ```
+
+Reszta komend przez ssh.
 
 ---
 
@@ -208,7 +209,9 @@ pacstrap -K /mnt \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin bash-completion
 ```
-DLA NVIDIA
+
+Dla NVIDIA:
+
 ```bash
 pacstrap -K /mnt \
   base linux linux-headers linux-firmware \
@@ -231,6 +234,7 @@ pacstrap -K /mnt \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin bash-completion
 ```
+
 ---
 
 ## 7. fstab i chroot
@@ -252,7 +256,8 @@ cat > /etc/hosts <<'EOF'
 EOF
 ```
 
-Dla NVIDIA
+Dla NVIDIA:
+
 ```bash
 echo gigant > /etc/hostname
 
@@ -356,7 +361,8 @@ grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults
 swapon --show
 ```
 
-Dla NIVDIA:
+Dla NVIDIA:
+
 ```bash
 dd if=/dev/zero of=/swap/swapfile bs=1M count=81936 status=progress
 chmod 600 /swap/swapfile
@@ -385,13 +391,36 @@ grep '^HOOKS=' /etc/mkinitcpio.conf
 mkinitcpio -P
 ```
 
-Dla Nvidia:
+Dla NVIDIA:
+
 ```bash
 sed -i 's/^MODULES=.*/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
 sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/' /etc/mkinitcpio.conf
 
+mkdir -p /etc/pacman.d/hooks
+
+cat > /etc/pacman.d/hooks/nvidia.hook <<'EOF'
+[Trigger]
+Operation=Install
+Operation=Upgrade
+Operation=Remove
+Type=Package
+Target=nvidia-open
+Target=nvidia-utils
+Target=linux
+
+[Action]
+Description=Update NVIDIA module in initcpio
+Depends=mkinitcpio
+When=PostTransaction
+NeedsTargets
+Exec=/usr/bin/mkinitcpio -P
+EOF
+
+grep '^MODULES=' /etc/mkinitcpio.conf
 grep '^HOOKS=' /etc/mkinitcpio.conf
 mkinitcpio -P
+```
 
 Oczekiwane:
 
@@ -430,12 +459,15 @@ sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet logl
 
 grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
 ```
-Dla Nvidia:
+
+Dla NVIDIA:
+
 ```bash
 sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 nvidia_drm.modeset=1 rd.luks.name=${CRYPT_UUID}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ resume=UUID=${ROOT_UUID} resume_offset=${RESUME_OFFSET}\"|" /etc/default/grub
 
 grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
 ```
+
 Instalacja GRUB:
 
 ```bash
@@ -645,6 +677,15 @@ test hibernacji:
 
 ```bash
 systemctl hibernate
+```
+
+Dla NVIDIA:
+
+```bash
+lspci -k | grep -A3 -E 'VGA|3D|Display'
+lsmod | grep nvidia
+cat /sys/module/nvidia_drm/parameters/modeset
+nvidia-smi
 ```
 
 ---
