@@ -212,8 +212,10 @@ pacstrap -K /mnt \
   xdg-desktop-portal-kde \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
-  konsole dolphin bash-completion
+  konsole dolphin bash-completion micro wl-clipboard
 ```
+
+Schowek **micro** na Plasma (Wayland): `micro` woła `wl-copy` / `wl-paste` z pakietu **`wl-clipboard`**. Bez tego Ctrl+V ze schowka systemowego zwykle nie działa.
 
 Dla NVIDIA:
 
@@ -237,7 +239,7 @@ pacstrap -K /mnt \
   xdg-desktop-portal-kde \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
-  konsole dolphin bash-completion
+  konsole dolphin bash-completion micro wl-clipboard
 ```
 
 ---
