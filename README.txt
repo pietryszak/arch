@@ -1,61 +1,44 @@
-# Arch Linux — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
+Arch Linux — LUKS2 + TPM2 PIN + Btrfs + Snapper + grub-btrfs + hibernacja + minimalne KDE
 
-**Szybki skok (sekcje 1–4):** [1 — Start z Arch ISO](#1-start-z-arch-iso) · [2 — Partycjonowanie](#2-partycjonowanie) · [3 — LUKS2](#3-luks2) · [4 — Btrfs i subvolumy](#4-btrfs-i-subvolumy)
+Szybki skok (sekcje 1–4): 1 — Start z Arch ISO (#1-start-z-arch-iso) · 2 — Partycjonowanie (#2-partycjonowanie) · 3 — LUKS2 (#3-luks2) · 4 — Btrfs i subvolumy (#4-btrfs-i-subvolumy)
 
----
-
-## 1. Start z Arch ISO
+1. Start z Arch ISO
 
 Połączenie Wi-Fi z live ISO:
 
-```bash
 iwctl
-```
 
-W `iwctl`:
+W iwctl:
 
-```text
 device list
 station wlan0 scan
 station wlan0 get-networks
 station wlan0 connect NAZWA_WIFI
 exit
-```
 
 Test:
 
-```bash
 ping -c 3 archlinux.org
-```
 
-```bash
 loadkeys pl
 timedatectl set-ntp true
-```
 
 Na live ISO ustaw hasło roota i uruchom SSH:
 
-```bash
 passwd
 systemctl start sshd
 ip -br a
-```
 
 Z drugiego komputera połącz się tak:
 
-```bash
 ssh root@ADRES_IP
-```
 
 Reszta komend przez ssh.
 
----
-
-## 2. Partycjonowanie
+2. Partycjonowanie
 
 Uwaga: to kasuje dysk.
 
-```bash
 DISK=/dev/nvme0n1
 
 sgdisk --zap-all "$DISK"
@@ -65,45 +48,31 @@ sgdisk -n 1:0:+1G -t 1:ef00 -c 1:"EFI" "$DISK"
 sgdisk -n 2:0:0   -t 2:8309 -c 2:"CRYPTROOT" "$DISK"
 
 partprobe "$DISK"
-```
 
 Format EFI:
 
-```bash
 mkfs.fat -F32 -n EFI ${DISK}p1
-```
 
----
+3. LUKS2
 
-## 3. LUKS2
-
-```bash
 cryptsetup luksFormat --type luks2 ${DISK}p2
 cryptsetup open ${DISK}p2 cryptroot
-```
 
 Sprawdzenie:
 
-```bash
 lsblk -f
-```
 
----
+4. Btrfs i subvolumy
 
-## 4. Btrfs i subvolumy
-
-```bash
 mkfs.btrfs -f -L ARCH /dev/mapper/cryptroot
 mount /dev/mapper/cryptroot /mnt
-```
 
 Tworzenie subvolumów:
 
-Osobne subvolumy pod profile: **`@mozilla`** — Firefox (`~/.mozilla`), **`@vivaldi`** — stabilny Vivaldi (`~/.config/vivaldi`), **`@vivaldi-snapshot`** — Vivaldi Snapshot z AUR (`~/.config/vivaldi-snapshot`), **`@thunderbird`** — Thunderbird (`~/.thunderbird`). **Nie montujesz ich w §5** — dopiero po instalacji, zalogowanym użytkowniku i pierwszym rozruchu dodajesz wpisy w `/etc/fstab` (albo robisz to w osobnym README / skrypcie); wtedy `useradd` i `/etc/skel` z §8 działają bez ostrzeżeń. **`@ssh`** i **`@gnupg`** — na późniejsze bind-mounty.
+Osobne subvolumy pod profile: @mozilla — Firefox (~/.mozilla), @vivaldi — stabilny Vivaldi (~/.config/vivaldi), @vivaldi-snapshot — Vivaldi Snapshot z AUR (~/.config/vivaldi-snapshot), @thunderbird — Thunderbird (~/.thunderbird). Nie montujesz ich w §5 — dopiero po instalacji, zalogowanym użytkowniku i pierwszym rozruchu dodajesz wpisy w /etc/fstab (albo robisz to w osobnym README / skrypcie); wtedy useradd i /etc/skel z §8 działają bez ostrzeżeń. @ssh i @gnupg — na późniejsze bind-mounty.
 
-**Snapper:** jeśli zamontujesz któryś z tych subvolumów *wewnątrz* `/home`, snapshot `snapper -c home` **nie obejmie** ich plików (zagnieżdżone subvolumy Btrfs — patrz też zdanie pod §17).
+Snapper: jeśli zamontujesz któryś z tych subvolumów wewnątrz /home, snapshot snapper -c home nie obejmie ich plików (zagnieżdżone subvolumy Btrfs — patrz też zdanie pod §17).
 
-```bash
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
 btrfs subvolume create /mnt/@snapshots
@@ -122,38 +91,26 @@ btrfs subvolume create /mnt/@vivaldi-snapshot
 btrfs subvolume create /mnt/@thunderbird
 btrfs subvolume create /mnt/@ssh
 btrfs subvolume create /mnt/@gnupg
-```
 
-```bash
 umount /mnt
-```
 
----
-
-## 5. Montowanie systemu
+5. Montowanie systemu
 
 Opcje:
 
-```bash
 BTRFS_OPTS="noatime,compress=zstd:3,ssd,space_cache=v2,discard=async"
 BTRFS_SWAP_OPTS="noatime,ssd,space_cache=v2,discard=async"
-```
 
 Root:
 
-```bash
 mount -o "$BTRFS_OPTS",subvol=@ /dev/mapper/cryptroot /mnt
-```
 
 Katalogi:
 
-```bash
 mkdir -p /mnt/{boot,home,.snapshots,var/log,var/cache/pacman/pkg,var/tmp,var/spool,opt,swap,var/lib/libvirt}
-```
 
 Mounty:
 
-```bash
 mount ${DISK}p1 /mnt/boot
 
 mount -o "$BTRFS_OPTS",subvol=@home /dev/mapper/cryptroot /mnt/home
@@ -172,29 +129,21 @@ mount -o "$BTRFS_OPTS",subvol=@spool /dev/mapper/cryptroot /mnt/var/spool
 mount -o "$BTRFS_OPTS",subvol=@opt /dev/mapper/cryptroot /mnt/opt
 mount -o "$BTRFS_SWAP_OPTS",subvol=@swap /dev/mapper/cryptroot /mnt/swap
 mount -o "$BTRFS_OPTS",subvol=@libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
-```
 
 Sprawdzenie:
 
-```bash
 findmnt -R /mnt -o TARGET,SOURCE,FSTYPE,OPTIONS
-```
 
-Przed `pacstrap` utwórz `/mnt/etc/vconsole.conf`, bo instalacja kernela odpala `mkinitcpio`, a hook `sd-vconsole` szuka tego pliku w instalowanym systemie:
+Przed pacstrap utwórz /mnt/etc/vconsole.conf, bo instalacja kernela odpala mkinitcpio, a hook sd-vconsole szuka tego pliku w instalowanym systemie:
 
-```bash
 mkdir -p /mnt/etc
 
 cat > /mnt/etc/vconsole.conf <<'EOF'
 KEYMAP=pl
 EOF
-```
 
----
+6. Minimalny pacstrap
 
-## 6. Minimalny pacstrap
-
-```bash
 pacstrap -K /mnt \
   base linux linux-headers linux-firmware \
   intel-ucode \
@@ -213,11 +162,9 @@ pacstrap -K /mnt \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin bash-completion
-```
 
 Dla NVIDIA:
 
-```bash
 pacstrap -K /mnt \
   base linux linux-headers linux-firmware \
   amd-ucode \
@@ -238,20 +185,14 @@ pacstrap -K /mnt \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
   konsole dolphin bash-completion
-```
 
----
+7. fstab i chroot
 
-## 7. fstab i chroot
-
-```bash
 genfstab -U /mnt >> /mnt/etc/fstab
 arch-chroot /mnt
-```
 
 Hostname:
 
-```bash
 echo arch > /etc/hostname
 
 cat > /etc/hosts <<'EOF'
@@ -259,11 +200,9 @@ cat > /etc/hosts <<'EOF'
 ::1       localhost
 127.0.1.1 arch.localdomain arch
 EOF
-```
 
 Dla NVIDIA:
 
-```bash
 echo gigant > /etc/hostname
 
 cat > /etc/hosts <<'EOF'
@@ -271,11 +210,9 @@ cat > /etc/hosts <<'EOF'
 ::1       localhost
 127.0.1.1 gigant.localdomain gigant
 EOF
-```
 
 Locale i konsola:
 
-```bash
 cat > /etc/vconsole.conf <<'EOF'
 KEYMAP=pl
 EOF
@@ -294,53 +231,37 @@ LC_MONETARY=pl_PL.UTF-8
 LC_MEASUREMENT=pl_PL.UTF-8
 LC_PAPER=pl_PL.UTF-8
 EOF
-```
 
----
+8. Użytkownik i sudo
 
-## 8. Użytkownik i sudo
-
-```bash
 passwd
 
 useradd -m -G wheel,audio,video,input,storage,lp,network,power -s /bin/bash pietryszak
 passwd pietryszak
 
 grep -q '^%wheel ALL=(ALL:ALL) ALL' /etc/sudoers || sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
-```
 
 Sprawdzenie:
 
-```bash
 id pietryszak
 passwd -S root
 passwd -S pietryszak
-```
 
----
+9. Poprawka /swap w fstab
 
-## 9. Poprawka `/swap` w fstab
+Po genfstab trzeba usunąć compress=zstd:3 z wpisu /swap.
 
-Po `genfstab` trzeba usunąć `compress=zstd:3` z wpisu `/swap`.
-
-```bash
 sed -i '\|[[:space:]]/swap[[:space:]]| s/,compress=zstd:3//' /etc/fstab
 grep -E '[[:space:]]/swap[[:space:]]' /etc/fstab
-```
 
-Poprawny wpis `/swap` ma wyglądać mniej więcej tak:
+Poprawny wpis /swap ma wyglądać mniej więcej tak:
 
-```text
 UUID=... /swap btrfs rw,noatime,ssd,discard=async,space_cache=v2,subvol=/@swap 0 0
-```
 
-Bez `compress=zstd:3`.
+Bez compress=zstd:3.
 
----
+10. Swapfile pod hibernację — ważna poprawiona metoda
 
-## 10. Swapfile pod hibernację — ważna poprawiona metoda
-
-```bash
 swapoff -a 2>/dev/null || true
 rm -f /swap/swapfile
 
@@ -351,11 +272,9 @@ btrfs property set /swap compression "" 2>/dev/null || true
 touch /swap/swapfile
 chattr +C /swap/swapfile
 lsattr /swap/swapfile
-```
 
 Tworzenie pliku 40 GiB:
 
-```bash
 dd if=/dev/zero of=/swap/swapfile bs=1M count=40968 status=progress
 chmod 600 /swap/swapfile
 mkswap /swap/swapfile
@@ -364,11 +283,9 @@ swapon /swap/swapfile
 grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults 0 0" >> /etc/fstab
 
 swapon --show
-```
 
 Dla NVIDIA:
 
-```bash
 dd if=/dev/zero of=/swap/swapfile bs=1M count=81936 status=progress
 chmod 600 /swap/swapfile
 mkswap /swap/swapfile
@@ -377,28 +294,20 @@ swapon /swap/swapfile
 grep -q '^/swap/swapfile ' /etc/fstab || echo "/swap/swapfile none swap defaults 0 0" >> /etc/fstab
 
 swapon --show
-```
 
-```bash
 btrfs inspect-internal map-swapfile -r /swap/swapfile
-```
 
----
-
-## 11. mkinitcpio pod LUKS + systemd initramfs
+11. mkinitcpio pod LUKS + systemd initramfs
 
 Ustawienie hooków bez ręcznej edycji:
 
-```bash
 sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/' /etc/mkinitcpio.conf
 
 grep '^HOOKS=' /etc/mkinitcpio.conf
 mkinitcpio -P
-```
 
 Dla NVIDIA:
 
-```bash
 sed -i 's/^MODULES=.*/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
 sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/' /etc/mkinitcpio.conf
 
@@ -426,19 +335,13 @@ grep '^MODULES=' /etc/mkinitcpio.conf
 grep '^HOOKS=' /etc/mkinitcpio.conf
 mkinitcpio -P
 grep '^HOOKS=' /etc/mkinitcpio.conf
-```
 
 Oczekiwane:
 
-```text
 HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)
-```
 
----
+12. UUID-y, resume offset, crypttab.initramfs
 
-## 12. UUID-y, resume offset, crypttab.initramfs
-
-```bash
 CRYPT_UUID=$(blkid -s UUID -o value /dev/nvme0n1p2)
 ROOT_UUID=$(findmnt -no UUID /)
 RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r /swap/swapfile)
@@ -446,103 +349,71 @@ RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r /swap/swapfile)
 echo "CRYPT_UUID=$CRYPT_UUID"
 echo "ROOT_UUID=$ROOT_UUID"
 echo "RESUME_OFFSET=$RESUME_OFFSET"
-```
 
-```bash
 cat > /etc/crypttab.initramfs <<EOF
 cryptroot UUID=${CRYPT_UUID} none tpm2-device=auto
 EOF
 
 cat /etc/crypttab.initramfs
-```
 
----
+13. GRUB kernel params
 
-## 13. GRUB kernel params
-
-```bash
 sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 rd.luks.name=${CRYPT_UUID}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ resume=UUID=${ROOT_UUID} resume_offset=${RESUME_OFFSET}\"|" /etc/default/grub
 
 grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
-```
 
 Dla NVIDIA:
 
-```bash
 sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 nvidia_drm.modeset=1 rd.luks.name=${CRYPT_UUID}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ resume=UUID=${ROOT_UUID} resume_offset=${RESUME_OFFSET}\"|" /etc/default/grub
 
 grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
-```
 
 Instalacja GRUB:
 
-```bash
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=ARCH
 grub-mkconfig -o /boot/grub/grub.cfg
-```
 
-Ostrzeżenie o `os-prober` można zignorować, jeśli nie ma dual-boota.
+Ostrzeżenie o os-prober można zignorować, jeśli nie ma dual-boota.
 
----
-
-## 14. TPM2 + PIN
+14. TPM2 + PIN
 
 Sprawdzenie TPM:
 
-```bash
 systemd-cryptenroll --tpm2-device=list
-```
 
 Dodanie TPM2 + PIN:
 
-```bash
 systemd-cryptenroll /dev/nvme0n1p2 --tpm2-device=auto --tpm2-with-pin=yes
-```
 
 Sprawdzenie:
 
-```bash
 systemd-cryptenroll /dev/nvme0n1p2
-```
 
-Po poprawnym dodaniu TPM2 tokena, czyli gdy `systemd-cryptenroll /dev/nvme0n1p2` pokazuje slot `tpm2`, przebuduj initramfs i GRUB:
+Po poprawnym dodaniu TPM2 tokena, czyli gdy systemd-cryptenroll /dev/nvme0n1p2 pokazuje slot tpm2, przebuduj initramfs i GRUB:
 
-```bash
 mkinitcpio -P
 grub-mkconfig -o /boot/grub/grub.cfg
-```
 
----
-
-## 15. Usługi
+15. Usługi
 
 Włączenie podstaw:
 
-```bash
 systemctl enable NetworkManager
 systemctl enable bluetooth
 systemctl enable plasmalogin.service
-```
 
 Sprawdzenie login managera:
 
-```bash
 systemctl list-unit-files | grep -Ei 'plasma|login'
-```
 
 Oczekiwane:
 
-```text
 plasmalogin.service
-```
 
----
-
-## 16. Snapper root — poprawiona metoda z `--no-dbus`
+16. Snapper root — poprawiona metoda z --no-dbus
 
 Root:
 
-```bash
 umount /.snapshots 2>/dev/null || true
 rm -rf /.snapshots
 
@@ -559,13 +430,9 @@ chmod 750 /.snapshots
 
 snapper --no-dbus -c root create --description "fresh encrypted Arch install"
 snapper --no-dbus -c root list
-```
 
----
+17. Snapper home — poprawiona metoda z --no-dbus
 
-## 17. Snapper home — poprawiona metoda z `--no-dbus`
-
-```bash
 umount /home/.snapshots 2>/dev/null || true
 rm -rf /home/.snapshots
 
@@ -580,50 +447,34 @@ chmod 750 /home/.snapshots
 
 snapper --no-dbus -c home create --description "fresh encrypted home snapshot"
 snapper --no-dbus -c home list
-```
 
-Snapshoty `snapper -c home` nie obejmują zagnieżdżonych subvolumów profili z §4 — jeśli zamontujesz je pod `/home`, patrz krótka uwaga przy §4.
+Snapshoty snapper -c home nie obejmują zagnieżdżonych subvolumów profili z §4 — jeśli zamontujesz je pod /home, patrz krótka uwaga przy §4.
 
----
+17.1 Instalacja snap-pac po konfiguracji Snappera
 
-## 17.1 Instalacja snap-pac po konfiguracji Snappera
+snap-pac instalujemy dopiero po utworzeniu konfiguracji Snappera dla / i /home.
+Nie instalować snap-pac w pacstrap, bo jego hooki pacmana mogą uruchomić się zanim Snapper będzie gotowy.
+Uwaga: w chroot po instalacji snap-pac może pojawić się komunikat fatal library error, lookup self. Jeśli pacman -Q snap-pac potwierdza instalację, a snapper --no-dbus -c root list działa, można to zignorować. Po normalnym bootowaniu systemu hooki snap-pac działają poprawnie.
 
-`snap-pac` instalujemy dopiero po utworzeniu konfiguracji Snappera dla `/` i `/home`.  
-Nie instalować `snap-pac` w `pacstrap`, bo jego hooki pacmana mogą uruchomić się zanim Snapper będzie gotowy.
-Uwaga: w `chroot` po instalacji `snap-pac` może pojawić się komunikat `fatal library error, lookup self`. Jeśli `pacman -Q snap-pac` potwierdza instalację, a `snapper --no-dbus -c root list` działa, można to zignorować. Po normalnym bootowaniu systemu hooki `snap-pac` działają poprawnie.
-
-```bash
 pacman -S --needed snap-pac
-```
 
----
+18. Timery Snappera i grub-btrfs
 
-## 18. Timery Snappera i grub-btrfs
-
-```bash
 systemctl enable snapper-timeline.timer
 systemctl enable snapper-cleanup.timer
 systemctl enable grub-btrfsd.service
-```
 
 Po pierwszych snapshotach:
 
-```bash
 grub-mkconfig -o /boot/grub/grub.cfg
-```
 
 Oczekiwane:
 
-```text
 Detecting snapshots ...
 Found snapshot: ... @snapshots/1/snapshot ...
-```
 
----
+19. Finalny check przed rebootem
 
-## 19. Finalny check przed rebootem
-
-```bash
 cat /etc/fstab | grep -E ' / |/boot|/home|/swap|swapfile'
 grep -E '[[:space:]]/[[:space:]]+btrfs' /etc/fstab
 
@@ -637,96 +488,67 @@ grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub
 
 snapper --no-dbus -c root list
 snapper --no-dbus -c home list
-```
 
 Ostatnie generowanie:
 
-```bash
 mkinitcpio -P
 grub-mkconfig -o /boot/grub/grub.cfg
-```
 
 Wyjście:
 
-```bash
 exit
-```
 
-Jeśli `/mnt/swap` jest busy:
+Jeśli /mnt/swap jest busy:
 
-```bash
 swapoff /mnt/swap/swapfile 2>/dev/null || swapoff -a
 umount -R /mnt
 reboot
-```
 
----
-
-## 20. Po pierwszym bootowaniu
+20. Po pierwszym bootowaniu
 
 Po zalogowaniu:
 
-```bash
 cat /proc/cmdline
 swapon --show
 findmnt -R /
 sudo snapper -c root list
 sudo snapper -c home list
 cat /sys/power/state
-```
 
 Jeśli jest:
 
-```text
 freeze mem disk
-```
 
 test hibernacji:
 
-```bash
 systemctl hibernate
-```
 
 Dla NVIDIA:
 
-```bash
 lsmod | grep nvidia
 nvidia-smi
-```
 
----
-
-## 21. Baseline snapshot po pierwszych zmianach
+21. Baseline snapshot po pierwszych zmianach
 
 Po zainstalowaniu i drobnych zmianach wykonano baseline:
 
-```bash
 sudo snapper -c root create --description "baseline before system tweaks"
 sudo snapper -c home create --description "baseline home before tweaks"
-```
 
-```bash
 sudo snapper -c root list
 sudo snapper -c home list
-```
 
 Oznaczenie jako important:
 
-```bash
 sudo snapper -c root modify --cleanup-algorithm important numer
 sudo snapper -c home modify --cleanup-algorithm important numer
-```
 
 Odświeżenie GRUB:
 
-```bash
 sudo grub-mkconfig -o /boot/grub/grub.cfg
-```
 
 Oczekiwane:
 
-```text
 Found snapshot: ... @snapshots/8/snapshot | single | baseline before system tweaks |
-```
 
-Uwaga: GRUB pokazuje snapshoty root. Snapshoty `/home` nie są bootowalne i nie będą w menu GRUB.
+Uwaga: GRUB pokazuje snapshoty root. Snapshoty /home nie są bootowalne i nie będą w menu GRUB.
