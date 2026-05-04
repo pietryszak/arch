@@ -99,7 +99,7 @@ mount /dev/mapper/cryptroot /mnt
 
 Tworzenie subvolumów:
 
-Osobne subvolumy pod profile aplikacji (bind-mounty ustawiasz później we własnym zakresie): **`@mozilla`** — Firefox (`~/.mozilla`), **`@vivaldi`** — stabilny Vivaldi (`~/.config/vivaldi`), **`@vivaldi-snapshot`** — Vivaldi Snapshot z AUR (`~/.config/vivaldi-snapshot`).
+Osobne subvolumy pod profile: **`@mozilla`** — Firefox (`~/.mozilla`), **`@vivaldi`** — stabilny Vivaldi (`~/.config/vivaldi`), **`@vivaldi-snapshot`** — Vivaldi Snapshot z AUR (`~/.config/vivaldi-snapshot`), **`@thunderbird`** — Thunderbird (`~/.thunderbird`); montaż pod `home/pietryszak/...` jest w §5. **`@ssh`** i **`@gnupg`** tworzysz tutaj na przyszłe bind-mounty (ścieżki ustawisz sam).
 
 ```bash
 btrfs subvolume create /mnt/@
@@ -149,14 +149,23 @@ Katalogi:
 mkdir -p /mnt/{boot,home,.snapshots,var/log,var/cache/pacman/pkg,var/tmp,var/spool,opt,swap,var/lib/libvirt}
 ```
 
-Mounty:
+Mounty (ścieżki pod `home/pietryszak/...` zakładają użytkownika z §8 — przy innej nazwie dostosuj `mkdir` i `mount`):
 
 ```bash
 mount ${DISK}p1 /mnt/boot
 
 mount -o "$BTRFS_OPTS",subvol=@home /dev/mapper/cryptroot /mnt/home
-mkdir -p /mnt/home/.snapshots
+mkdir -p /mnt/home/.snapshots \
+         /mnt/home/pietryszak/.mozilla \
+         /mnt/home/pietryszak/.config/vivaldi \
+         /mnt/home/pietryszak/.config/vivaldi-snapshot \
+         /mnt/home/pietryszak/.thunderbird
 mount -o "$BTRFS_OPTS",subvol=@home_snapshots /dev/mapper/cryptroot /mnt/home/.snapshots
+
+mount -o "$BTRFS_OPTS",subvol=@mozilla /dev/mapper/cryptroot /mnt/home/pietryszak/.mozilla
+mount -o "$BTRFS_OPTS",subvol=@vivaldi /dev/mapper/cryptroot /mnt/home/pietryszak/.config/vivaldi
+mount -o "$BTRFS_OPTS",subvol=@vivaldi-snapshot /dev/mapper/cryptroot /mnt/home/pietryszak/.config/vivaldi-snapshot
+mount -o "$BTRFS_OPTS",subvol=@thunderbird /dev/mapper/cryptroot /mnt/home/pietryszak/.thunderbird
 
 mount -o "$BTRFS_OPTS",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 mount -o "$BTRFS_OPTS",subvol=@log /dev/mapper/cryptroot /mnt/var/log
@@ -171,6 +180,8 @@ mount -o "$BTRFS_OPTS",subvol=@opt /dev/mapper/cryptroot /mnt/opt
 mount -o "$BTRFS_SWAP_OPTS",subvol=@swap /dev/mapper/cryptroot /mnt/swap
 mount -o "$BTRFS_OPTS",subvol=@libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
 ```
+
+**Uwaga — Snapper i profile pod `/home`:** Ten układ **nie psuje** Snappera, timerów ani `snap-pac`. Konfiguracja `snapper -c home` dotyczy nadal wyłącznie subvolume **`@home`**. W Btrfs snapshot subvolume **nie obejmuje zawartości innych subvolumów** zamontowanych „w środku” (`@mozilla`, `@vivaldi`, `@vivaldi-snapshot`, `@thunderbird`). Dane tych aplikacji są więc **poza** snapshotami `-c home`: przy przywracaniu snapshotu `/home` reszta domu się cofnie, ale **profile przeglądarki i poczty nie** — świadomy podział (wyższa kontrola osobno / osobne kopie). Jeśli chcesz snapshotować któryś profil Snapperem, potrzebna jest **osobna** konfiguracja na ten subvolume (albo inna strategia backupu).
 
 Sprawdzenie:
 
@@ -578,6 +589,8 @@ chmod 750 /home/.snapshots
 snapper --no-dbus -c home create --description "fresh encrypted home snapshot"
 snapper --no-dbus -c home list
 ```
+
+Snapshoty `home` nie obejmują zagnieżdżonych subvolumów profili z §5 — patrz uwaga pod montażami w §5.
 
 ---
 
