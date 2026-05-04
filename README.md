@@ -113,7 +113,7 @@ btrfs subvolume create /mnt/@opt
 btrfs subvolume create /mnt/@swap
 btrfs subvolume create /mnt/@libvirt
 btrfs subvolume create /mnt/@mozilla
-btrfs subvolume create /mnt/@brave
+btrfs subvolume create /mnt/@vivaldi
 btrfs subvolume create /mnt/@thunderbird
 btrfs subvolume create /mnt/@ssh
 btrfs subvolume create /mnt/@gnupg
