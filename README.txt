@@ -161,7 +161,7 @@ pacstrap -K /mnt \
   xdg-desktop-portal-kde \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
-  konsole dolphin bash-completion
+  konsole dolphin bash-completion micro
 
 Dla NVIDIA:
 
@@ -184,7 +184,7 @@ pacstrap -K /mnt \
   xdg-desktop-portal-kde \
   breeze-gtk kde-gtk-config \
   noto-fonts noto-fonts-emoji ttf-dejavu \
-  konsole dolphin bash-completion
+  konsole dolphin bash-completion micro
 
 7. fstab i chroot
 
