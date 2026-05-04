@@ -434,6 +434,7 @@ EOF
 grep '^MODULES=' /etc/mkinitcpio.conf
 grep '^HOOKS=' /etc/mkinitcpio.conf
 mkinitcpio -P
+grep '^HOOKS=' /etc/mkinitcpio.conf
 ```
 
 Oczekiwane:
@@ -698,9 +699,7 @@ systemctl hibernate
 Dla NVIDIA:
 
 ```bash
-lspci -k | grep -A3 -E 'VGA|3D|Display'
 lsmod | grep nvidia
-cat /sys/module/nvidia_drm/parameters/modeset
 nvidia-smi
 ```
 
